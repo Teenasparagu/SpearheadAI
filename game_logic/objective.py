@@ -31,14 +31,15 @@ class Objective:
         
         
     def update_control(self, units):
-        new_control_team = self.get_control_team(units)
+        current_team = self.get_control_team(units)
 
-        # If control has changed, print the update
-        if new_control_team != self.control_team:
-            if new_control_team:
-                print(f"Objective at ({self.x}, {self.y}) is now controlled by Team {new_control_team}!")
-            else:
-                print(f"Objective at ({self.x}, {self.y}) is now uncontrolled.")
+        # Only change control if a new team takes it over
+        if current_team is None:
+            return  # No one nearby, retain previous control
+
+        if current_team != self.control_team:
+            self.control_team = current_team
+
             
     def __repr__(self):
         return f"Objective(x={self.x}, y={self.y}, controlled_by={self.control_team})"

@@ -58,19 +58,19 @@ def choose_battlefield():
 def get_objectives_for_battlefield(battlefield):
     if battlefield == "ghyran":
         return [
-            Objective(10, 7),
-            Objective(7, 37),
+            Objective(1, 22),
             Objective(30, 22),
-            Objective(53, 6),
-            Objective(50, 37),
+            Objective(58, 22),
+            Objective(15, 7),
+            Objective(45, 37),
         ]
     else:
         return [
-            Objective(12, 5),
-            Objective(45, 8),
+            Objective(7, 7),
+            Objective(51, 7),
             Objective(30, 22),
-            Objective(12, 35),
-            Objective(45, 38),
+            Objective(10, 38),
+            Objective(53, 38),
         ]
 
 def choose_deployment_map():
@@ -95,6 +95,28 @@ def zone_description(zone_func, board, zone_name):
 
 def deploy_units(board, units, territory_bounds, zone_name, player_label="Player"):
     print(zone_description(territory_bounds, board, zone_name))
+
+    if zone_name == "straight":
+        # Calculate bounds for rectangular deployment
+        mid_y = board.height // 2
+        buffer_cells = 12  # 6" buffer = 12 half-inch cells
+
+        if player_label.lower() == "player":
+            y_min = 0
+            y_max = mid_y - buffer_cells - 1
+        else:
+            y_min = mid_y + buffer_cells
+            y_max = board.height - 1
+
+        x_min = 0
+        x_max = board.width - 1
+
+        print(f"{player_label}'s deployment zone:")
+        print(f" - Top-left:     ({x_min}, {y_min})")
+        print(f" - Top-right:    ({x_max}, {y_min})")
+        print(f" - Bottom-left:  ({x_min}, {y_max})")
+        print(f" - Bottom-right: ({x_max}, {y_max})")
+
     print(f"{player_label}, begin deploying your units:")
 
     for unit in units:
@@ -195,3 +217,5 @@ def deployment_phase(board):
         print(f"AI chooses {first} to go first.")
 
     return player_units, ai_units, first
+
+#test to see if save works

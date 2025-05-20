@@ -234,3 +234,9 @@ class Board:
     def update_objective_control(self):
         for obj in self.objectives:
             obj.update_control(self.units)
+
+    def display_objective_status(self):
+        print("\nObjective Control Status:")
+        for obj in self.objectives:
+            owner = f"Team {obj.control_team}" if obj.control_team else "Uncontrolled"
+            print(f" - Objective at ({obj.x}, {obj.y}) is controlled by {owner}.")

@@ -205,7 +205,6 @@ def ai_movement_phase(board, ai_units):
     for unit in ai_units:
         if is_in_combat(unit, board):
             print(f"{unit.name} is in combat and cannot move unless retreating.")
-            # Optional: add AI retreat logic here
             continue
 
         # Decide whether to run (50% chance)
@@ -219,7 +218,7 @@ def ai_movement_phase(board, ai_units):
             unit.has_run = True
             print(f"{unit.name} chooses to Run! (Rolled {run_bonus})")
 
-        # Try up to 10 valid directions
+        # Try up to 10 directions
         for _ in range(10):
             direction = random.choice(list(direction_map.keys()))
             inches = round(random.uniform(1, move_range / 2), 1)
@@ -227,19 +226,15 @@ def ai_movement_phase(board, ai_units):
             dest_x = unit.x + int(round(dx * inches * 2))
             dest_y = unit.y + int(round(dy * inches * 2))
 
-            # Must stay on board
             if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
                 continue
-
-            # Must not end within 3" of any enemy
             if is_too_close_to_enemy(dest_x, dest_y, board, unit.team):
                 continue
 
             print(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
             success = board.move_unit(unit, dest_x, dest_y, confirm=True)
             if success:
-                print(f"{unit.name} moved to ({dest_x}, {dest_y}).")
-
+                break  # ✅ move only once per turn
         else:
             print(f"{unit.name} couldn't find a valid direction to move.")
 
