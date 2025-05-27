@@ -12,7 +12,7 @@ class StormcastFactory(FactionFactory):
             "num_models" : 5,
             "base_width": 1.5,
             "base_height": 1.5,
-            "attacks": []
+            "range": []
         },
 
         "Prosecutors": {
@@ -23,10 +23,10 @@ class StormcastFactory(FactionFactory):
             "num_models" : 3,
             "base_width": 1.5,
             "base_height": 1.5,
-            "attacks": [
+            "range": [
                 {
                     "name": "Stormcall Javelin",
-                    "range": 10,
+                    "range": 20,
                     "attacks": 1,
                     "to_hit": 3,
                     "to_wound": 3,
@@ -45,7 +45,7 @@ class StormcastFactory(FactionFactory):
             "num_models": 1,
             "base_width": 1.5,   # in inches
             "base_height": 1.5,   # use 2.0 or 2.5 for cavalry/mounted units
-            "attacks": []
+            "range": []
         },
 
         "Lord-Vigilant": {
@@ -56,7 +56,7 @@ class StormcastFactory(FactionFactory):
             "num_models": 1,
             "base_width": 2.0,   # in inches
             "base_height": 3.5,   # use 2.0 or 2.5 for cavalry/mounted units
-            "attacks": []
+            "range": []
         },
         
     }

@@ -7,7 +7,8 @@ class Model:
         self.y = y
         self.max_health = max_health
         self.current_health = max_health
-        self.base_diameter = base_diameter  # in inches
+        self.base_diameter = base_diameter
+        self.ranged_attacks = []
 
     def is_alive(self):
         return self.current_health > 0
@@ -23,7 +24,7 @@ class Model:
     def get_occupied_squares(self):
         occupied = []
         radius = self.base_diameter / 2.0
-        radius_in_tiles = int(round(radius / 0.5))  # each tile = 0.5 inches
+        radius_in_tiles = int(round(radius / 0.5))
 
         for dx in range(-radius_in_tiles, radius_in_tiles + 1):
             for dy in range(-radius_in_tiles, radius_in_tiles + 1):
@@ -48,7 +49,6 @@ class Unit:
         self.y = y if y is not None else 3
 
         if unit_data is None:
-            import importlib
             faction_module = importlib.import_module(f"game_logic.factions.{faction}")
             unit_data = faction_module.unit_definitions.get(name)
             if not unit_data:
@@ -59,21 +59,38 @@ class Unit:
         self.base_width = unit_data.get("base_width", 1.0)
         self.base_height = unit_data.get("base_height", 1.0)
         model_health = unit_data.get("health", 1)
-        self.attacks = unit_data.get("attacks", [])
+
+        self.ranged_attacks = unit_data.get("range", [])
+        self.melee_attacks = unit_data.get("melee", [])
 
         leader_x = self.x
         leader_y = self.y
+        base_diameter = max(self.base_width, self.base_height)
 
-        self.models = [Model(leader_x, leader_y, max_health=model_health,
-                             base_diameter=max(self.base_width, self.base_height))]
+        self.models = [Model(leader_x, leader_y, max_health=model_health, base_diameter=base_diameter)]
 
-        for i in range(1, self.num_models):
-            offset_x = (i % 3) - 1
-            offset_y = (i // 3) - 1
-            model_x = leader_x + offset_x
-            model_y = leader_y + offset_y
-            self.models.append(Model(model_x, model_y, max_health=model_health,
-                                     base_diameter=max(self.base_width, self.base_height)))
+        placed_positions = {(leader_x, leader_y)}
+        ring_radius = 1
+        model_index = 1
+
+        while model_index < self.num_models:
+            for dx in range(-ring_radius, ring_radius + 1):
+                for dy in range(-ring_radius, ring_radius + 1):
+                    new_x = leader_x + dx
+                    new_y = leader_y + dy
+                    if (new_x, new_y) not in placed_positions:
+                        placed_positions.add((new_x, new_y))
+                        self.models.append(Model(new_x, new_y, max_health=model_health, base_diameter=base_diameter))
+                        model_index += 1
+                        if model_index >= self.num_models:
+                            break
+                if model_index >= self.num_models:
+                    break
+            ring_radius += 1
+
+        for i, model in enumerate(self.models):
+            model.ranged_attacks = [atk for atk in self.ranged_attacks if atk.get("model_index") is None or atk.get("model_index") == i]
+
     def position(self):
         return self.x, self.y
 
@@ -99,3 +116,11 @@ class Unit:
 
     def model_count(self):
         return len(self.models)
+
+def is_in_combat(x, y, board, team, radius=6):
+    for enemy_unit in board.units:
+        if enemy_unit.team != team:
+            for model in enemy_unit.models:
+                if math.sqrt((x - model.x)**2 + (y - model.y)**2) < radius:
+                    return True
+    return False

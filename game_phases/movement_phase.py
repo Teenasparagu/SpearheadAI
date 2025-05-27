@@ -1,29 +1,6 @@
 import math
 import random
-
-def is_in_combat(unit, board, combat_range=6):
-    """Check if this unit is within 3\" (6 squares) of any enemy model."""
-    for model in unit.models:
-        for enemy_unit in board.units:
-            if enemy_unit.team == unit.team:
-                continue  # Skip friendly units
-
-            for enemy_model in enemy_unit.models:
-                dx = model.x - enemy_model.x
-                dy = model.y - enemy_model.y
-                dist = math.sqrt(dx**2 + dy**2)
-                if dist <= combat_range:
-                    return True
-    return False
-
-
-def is_too_close_to_enemy(x, y, board, team, radius=6):
-    for enemy_unit in board.units:
-        if enemy_unit.team != team:
-            for model in enemy_unit.models:
-                if math.sqrt((x - model.x)**2 + (y - model.y)**2) < radius:
-                    return True
-    return False
+from game_logic.units import is_in_combat
 
 
 def player_movement_phase(board, player_units):
@@ -39,7 +16,7 @@ def player_movement_phase(board, player_units):
     for unit in player_units:
         print(f"\n{unit.name} starts at ({unit.x}, {unit.y})")
 
-        if is_in_combat(unit, board):
+        if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
             print(f"{unit.name} is in combat.")
             choice = input("Retreat? (Y/N): ").strip().lower()
             if choice in ["y", "yes"]:
@@ -114,7 +91,7 @@ def move_input_loop(unit, board, move_range):
                 continue
 
             # Check enemy proximity
-            if is_too_close_to_enemy(dest_x, dest_y, board, unit.team):
+            if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
                 print("You cannot end your move within 3 inches of an enemy unit (must charge to do so).")
                 continue
 
@@ -184,7 +161,7 @@ def retreat_move(unit, board):
             dest_y = unit.y + int(round(dy_normalized * distance_squares))
 
 
-            if is_too_close_to_enemy(dest_x, dest_y, board, unit.team):
+            if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
                 print("Retreat destination is too close to an enemy. Try a different direction.")
                 continue
 
@@ -203,7 +180,7 @@ def retreat_move(unit, board):
 def ai_movement_phase(board, ai_units):
     print("\nAI's Turn:")
     for unit in ai_units:
-        if is_in_combat(unit, board):
+        if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
             print(f"{unit.name} is in combat and cannot move unless retreating.")
             continue
 
@@ -228,7 +205,7 @@ def ai_movement_phase(board, ai_units):
 
             if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
                 continue
-            if is_too_close_to_enemy(dest_x, dest_y, board, unit.team):
+            if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
                 continue
 
             print(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
