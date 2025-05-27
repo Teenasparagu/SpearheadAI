@@ -35,15 +35,17 @@ class Model:
     def __repr__(self):
         return f"Model({self.x}, {self.y}, base={self.base_diameter}\")"
 
+
 class Unit:
-    def __init__(self, name, x, y, faction, team, num_models=5, control_score=None):
+    def __init__(self, name, faction, team, num_models=5, control_score=None, x=None, y=None):
         self.name = name
         self.faction = faction
         self.team = team
-        self.x = x
-        self.y = y
         self.num_models = num_models
         self.has_run = False
+
+        self.x = x if x is not None else 3
+        self.y = y if y is not None else 3
 
         # Import faction data
         faction_module = importlib.import_module(f"game_logic.factions.{faction}")
@@ -52,18 +54,25 @@ class Unit:
         if not unit_data:
             raise ValueError(f"Unit '{name}' not found in faction '{faction}'")
 
-        # Set stats from faction file, with default fallbacks
         self.move_range = unit_data.get("move_range", 6)
         self.control_score = control_score if control_score is not None else unit_data.get("control_score", 1)
-        self.base_diameter = unit_data.get("base_diameter", 1.0)
+        self.base_width = unit_data.get("base_width", 1.0)
+        self.base_height = unit_data.get("base_height", 1.0)
         model_health = unit_data.get("health", 1)
 
-        # Create models
-        self.models = [Model(x, y, max_health=model_health, base_diameter=self.base_diameter)]  # Leader
-        for i in range(1, num_models):
+        leader_x = self.x
+        leader_y = self.y
+
+        self.models = [Model(leader_x, leader_y, max_health=model_health,
+                             base_diameter=max(self.base_width, self.base_height))]
+
+        for i in range(1, self.num_models):
             offset_x = (i % 3) - 1
             offset_y = (i // 3) - 1
-            self.models.append(Model(x + offset_x, y + offset_y, max_health=model_health, base_diameter=self.base_diameter))
+            model_x = leader_x + offset_x
+            model_y = leader_y + offset_y
+            self.models.append(Model(model_x, model_y, max_health=model_health,
+                                     base_diameter=max(self.base_width, self.base_height)))
 
     def position(self):
         return self.x, self.y
@@ -85,7 +94,7 @@ class Unit:
                 if not model.is_alive():
                     print(f"{self.name}: A model has been slain!")
                     self.models.remove(model)
-                break  # Only one model takes damage at a time
+                break
         print(f"{self.name}: {len(self.models)} model(s) remaining.")
 
     def model_count(self):

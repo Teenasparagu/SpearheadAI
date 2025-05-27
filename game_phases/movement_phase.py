@@ -188,7 +188,7 @@ def retreat_move(unit, board):
                 print("Retreat destination is too close to an enemy. Try a different direction.")
                 continue
 
-            success = board.move_unit(unit, dest_x, dest_y, confirm=True)
+            success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 # ✅ Apply D3 mortal wounds after retreating
                 dmg = random.randint(1, 3)
@@ -232,7 +232,7 @@ def ai_movement_phase(board, ai_units):
                 continue
 
             print(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
-            success = board.move_unit(unit, dest_x, dest_y, confirm=True)
+            success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 break  # ✅ move only once per turn
         else:
