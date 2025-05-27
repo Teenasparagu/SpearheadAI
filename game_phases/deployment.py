@@ -5,19 +5,22 @@ import math
 from game_logic.units import Unit
 from game_logic.board import Objective
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
-from display import print_board
+from game_logic.factions.skaven import SkavenFactory
+from game_logic.factions.stormcast import StormcastFactory
 
 FACTIONS_PATH = "game_logic/factions"
 
 def list_factions():
     return sorted([
         f.replace(".py", "") for f in os.listdir(FACTIONS_PATH)
-        if f.endswith(".py") and not f.startswith("__")
+        if f.endswith(".py") and not f.startswith("__") and f != "faction_factory.py"
     ])
 
 def load_faction_force(faction_name, team_number):
-    module = importlib.import_module(f"game_logic.factions." + faction_name)
-    return module.create_force(team=team_number)
+    module = importlib.import_module(f"game_logic.factions.{faction_name}")
+    factory_class = getattr(module, f"{faction_name.capitalize()}Factory")
+    factory = factory_class()
+    return factory.create_force(team=team_number)
 
 def choose_faction():
     factions = list_factions()
@@ -90,6 +93,32 @@ def choose_deployment_map():
             return "diagonal"
         else:
             print("Invalid choice.")
+
+def get_deployment_zones(board, map_type):
+    if map_type == "straight":
+        def defender_zone(x, y):
+            return y < (board.height // 2) - 12
+
+        def attacker_zone(x, y):
+            return y >= (board.height // 2) + 12
+
+    elif map_type == "diagonal":
+        slope = (15 - 43) / (59 - 20)
+        intercept = 43 - slope * 20
+
+        def line_y(x): return slope * x + intercept
+
+        def attacker_zone(x, y):
+            return y > line_y(x)
+
+        def defender_zone(x, y):
+            flipped_x = 59 - x
+            flipped_y = 43 - y
+            return attacker_zone(flipped_x, flipped_y)
+    else:
+        raise ValueError(f"Unknown map type: {map_type}")
+
+    return defender_zone, attacker_zone
 
 def zone_description(zone_func, board, zone_name):
     if zone_name == "diagonal":
@@ -189,7 +218,6 @@ def is_clear_of_objectives(x, y, rotated_shape, objectives):
     return True, None
 
 def deploy_terrain(board, team, zone):
-    from display import print_board
     from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
 
     zone_name = "Player 1" if team == 1 else "Player 2"
@@ -302,27 +330,8 @@ def deployment_phase(board):
 
 
     deployment_map = choose_deployment_map()
-    buffer = 0  # No buffer for now
-
-    if deployment_map == "straight":
-        def defender_zone(x, y): return y < (board.height // 2) - 12
-        def attacker_zone(x, y): return y >= (board.height // 2) + 12
-        zone_name = "straight"
-    else:
-        # Diagonal from (20, 43) to (59, 15)
-        slope = (15 - 43) / (59 - 20)
-        intercept = 43 - slope * 20
-
-        def line_y(x): return slope * x + intercept
-
-        def attacker_zone(x, y): return y > line_y(x)
-
-        def defender_zone(x, y):
-            flipped_x = 59 - x
-            flipped_y = 43 - y
-            return attacker_zone(flipped_x, flipped_y)
-
-        zone_name = "diagonal"
+    zone_name = deployment_map
+    defender_zone, attacker_zone = get_deployment_zones(board, deployment_map)
 
     deploy_terrain(board, team=1 if defender == "player" else 2, zone=[
         (x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)

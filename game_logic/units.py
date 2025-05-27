@@ -37,7 +37,7 @@ class Model:
 
 
 class Unit:
-    def __init__(self, name, faction, team, num_models=5, control_score=None, x=None, y=None):
+    def __init__(self, name, faction, team, num_models=5, control_score=None, x=None, y=None, unit_data=None):
         self.name = name
         self.faction = faction
         self.team = team
@@ -47,12 +47,12 @@ class Unit:
         self.x = x if x is not None else 3
         self.y = y if y is not None else 3
 
-        # Import faction data
-        faction_module = importlib.import_module(f"game_logic.factions.{faction}")
-        unit_data = faction_module.unit_definitions.get(name)
-
-        if not unit_data:
-            raise ValueError(f"Unit '{name}' not found in faction '{faction}'")
+        if unit_data is None:
+            import importlib
+            faction_module = importlib.import_module(f"game_logic.factions.{faction}")
+            unit_data = faction_module.unit_definitions.get(name)
+            if not unit_data:
+                raise ValueError(f"Unit '{name}' not found in faction '{faction}'")
 
         self.move_range = unit_data.get("move_range", 6)
         self.control_score = control_score if control_score is not None else unit_data.get("control_score", 1)
@@ -74,7 +74,6 @@ class Unit:
             model_y = leader_y + offset_y
             self.models.append(Model(model_x, model_y, max_health=model_health,
                                      base_diameter=max(self.base_width, self.base_height)))
-
     def position(self):
         return self.x, self.y
 
