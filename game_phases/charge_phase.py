@@ -170,7 +170,7 @@ def ai_charge_phase(board, ai_units, player_units):
             print(f"{unit.name}'s charge path is blocked at {blocked_tile}.")
             continue
 
-        success = board.move_unit(unit, dest_x, dest_y, confirm=False)
+        success = board.move_unit(unit, dest_x, dest_y)
         if success:
             print(f"{unit.name} successfully charged to ({dest_x}, {dest_y}).")
         else:

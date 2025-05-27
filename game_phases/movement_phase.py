@@ -118,7 +118,7 @@ def move_input_loop(unit, board, move_range):
                 print("You cannot end your move within 3 inches of an enemy unit (must charge to do so).")
                 continue
 
-            success = board.move_unit(unit, dest_x, dest_y, confirm=True, check_range=False)
+            success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 break
             else:

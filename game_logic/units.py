@@ -59,6 +59,7 @@ class Unit:
         self.base_width = unit_data.get("base_width", 1.0)
         self.base_height = unit_data.get("base_height", 1.0)
         model_health = unit_data.get("health", 1)
+        self.attacks = unit_data.get("attacks", [])
 
         leader_x = self.x
         leader_y = self.y

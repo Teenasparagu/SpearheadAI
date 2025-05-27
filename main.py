@@ -4,6 +4,8 @@ from game_phases.movement_phase import player_movement_phase, ai_movement_phase
 from game_phases.charge_phase import charge_phase, ai_charge_phase
 from game_phases.deployment import deployment_phase
 from game_phases.victory_phase import process_end_phase_actions, calculate_victory_points
+from game_phases.shooting_phase import shooting_phase
+
 
 def main():
     print("Welcome to Spearhead: Skirmish for the Realms!")
@@ -41,11 +43,11 @@ def main():
 
         # Execute turns based on priority
         if current_priority == "player":
-            player_turn(board, player_units, total_vp)
+            player_turn(board, player_units, ai_units, total_vp)
             ai_turn(board, player_units, ai_units, total_vp)
         else:
             ai_turn(board, player_units, ai_units, total_vp)
-            player_turn(board, player_units, total_vp)
+            player_turn(board, player_units, ai_units, total_vp)
 
     # Final results
     print("\n=== Game Over ===")
@@ -57,17 +59,30 @@ def main():
     else:
         print(">> It's a tie!")
 
-def player_turn(board, player_units, total_vp):
+def player_turn(board, player_units, ai_units, total_vp):
     print("\n-- Player Turn --")
+
     print("\n[Start of Round Objective Check]")
     board.update_objective_control()
     board.display_objective_status()
+
+    # Movement
     player_movement_phase(board, player_units)
+
+    # Shooting
+    shooting_phase(board, player_units, ai_units)
+
+    # Charge
     charge_phase(board, player_units)
+
+    # End Phase Actions
     process_end_phase_actions(board, player_units)
+
     print("\n[End of Round Objective Check]")
     board.update_objective_control()
     board.display_objective_status()
+
+    # Scoring
     calculate_victory_points(board, total_vp, scoring_team=1)
 
 def ai_turn(board, player_units, ai_units, total_vp):
