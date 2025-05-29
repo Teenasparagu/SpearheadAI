@@ -10,9 +10,19 @@ class SkavenFactory(FactionFactory):
             "control_score": 1,
             "health": 1,  
             "num_models": 10,
-            "base_width": 1.0,    # circular base: 1" diameter
+            "base_width": 1.0,
             "base_height": 1.0,
-            "range": []
+            "range": [],
+            "melee_weapons": [
+            {
+            "name": "Rusty Blade",
+            "attacks": 2,
+            "to_hit": 4,
+            "to_wound": 5,
+            "rend": 0,
+            "damage": 1
+            },
+            ],
         },
         
         "Rat Ogors": {
@@ -35,18 +45,28 @@ class SkavenFactory(FactionFactory):
                 "damage": 1,
                 "keywords": ["shoot_in_combat"]
             }
+            ],
+            "melee_weapons": [
+            {
+            "name": "Claws, Blades and Fangs",
+            "attacks": 5,
+            "to_hit": 4,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": 2
+            },
             ]
         },
 
         "Clawlord": {
-        "count": 1,
-        "move_range": 18,
-        "control_score": 2,
-        "health": 7,
-        "num_models": 1,
-        "base_width": 2,
-        "base_height": 3,
-        "range": [  # <- renamed from "range" to match expected attribute
+            "count": 1,
+            "move_range": 18,
+            "control_score": 2,
+            "health": 7,
+            "num_models": 1,
+            "base_width": 2,
+            "base_height": 3,
+        "range": [  
             {
                 "name": "Ratling Pistol",
                 "range": 20,
@@ -57,7 +77,25 @@ class SkavenFactory(FactionFactory):
                 "damage": 1,
                 "keywords": ["shoot_in_combat", "crit_auto_wound"]
             }
-        ]
+        ],
+        "melee_weapons": [
+        {
+        "name": "Warpforged Halberd",
+        "attacks": 5,
+        "to_hit": 3,
+        "to_wound": 4,
+        "rend": 1,
+        "damage": 2
+        },
+        {
+        "name": "Gnaw-beast's Chisel Fangs",
+        "attacks": 4,    
+        "to_hit": 4,
+        "to_wound": 3,
+        "rend": 1,
+        "damage": "d3"
+        }
+        ],
         },
 
         "Grey Seer": {
@@ -68,7 +106,17 @@ class SkavenFactory(FactionFactory):
             "num_models": 1,
             "base_width": 1.5,
             "base_height": 1.5,
-            "range": []
+            "range": [],
+            "melee_weapons": [
+            {
+            "name": "Warpstone Staff",
+            "attacks": 3,
+            "to_hit": 4,
+            "to_wound": 4,
+            "rend": 1,
+            "damage": "d3"
+            },
+            ]
         },
 
         "Warlock Engineer": {
@@ -90,6 +138,16 @@ class SkavenFactory(FactionFactory):
                 "damage": "D3",
                 "keywords": ["crit_auto_wound"]
             }
+            ],
+            "melee_weapons": [
+            {
+            "name": "Warpforged Dagger",
+            "attacks": 3,
+            "to_hit": 4,
+            "to_wound": 4,
+            "rend": 0,
+            "damage": 2
+            },
             ]
         },
     }

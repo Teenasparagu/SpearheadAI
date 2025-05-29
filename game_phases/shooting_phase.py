@@ -1,6 +1,92 @@
 import random
 import math
-from game_logic.units import is_in_combat
+from game_logic.units import apply_damage
+
+
+
+import math
+import random
+
+def is_valid_shooting_target(shooter, target, board, max_range=24):
+    for shooter_model in shooter.models:
+        for target_model in target.models:
+            dx = target_model.x - shooter_model.x
+            dy = target_model.y - shooter_model.y
+            distance = math.sqrt(dx**2 + dy**2)
+            if distance <= max_range:
+                if board.is_path_clear(shooter_model.x, shooter_model.y, target_model.x, target_model.y):
+                    return True
+    return False
+
+def get_player_units_that_can_shoot(player_units, ai_units, board):
+    eligible = []
+    for unit in player_units:
+        if not unit.models or not hasattr(unit, "ranged_weapons"):
+            continue
+        for enemy in ai_units:
+            if is_valid_shooting_target(unit, enemy, board):
+                eligible.append(unit)
+                break
+    return eligible
+
+def list_targets_for_unit(unit, ai_units, board):
+    targets = []
+    for enemy in ai_units:
+        if is_valid_shooting_target(unit, enemy, board):
+            targets.append(enemy)
+    return targets
+
+def player_shooting_phase(board, player_units, ai_units):
+    print("\n--- Shooting Phase (Player) ---")
+    remaining_units = get_player_units_that_can_shoot(player_units, ai_units, board)
+
+    while remaining_units:
+        print("\nUnits available to shoot:")
+        for idx, unit in enumerate(remaining_units):
+            print(f"{idx + 1}. {unit.name} (at {unit.x}, {unit.y})")
+
+        try:
+            choice = int(input("Choose a unit to shoot with (number), or 0 to skip shooting: ")) - 1
+        except ValueError:
+            print("Invalid input.")
+            continue
+
+        if choice == -1:
+            print("You skipped shooting with the remaining units.")
+            break
+
+        if 0 <= choice < len(remaining_units):
+            shooting_unit = remaining_units[choice]
+            targets = list_targets_for_unit(shooting_unit, ai_units, board)
+
+            if not targets:
+                print("No valid targets in range or line of sight.")
+                remaining_units.remove(shooting_unit)
+                continue
+
+            print("\nAvailable targets:")
+            for i, target in enumerate(targets):
+                print(f"{i + 1}. {target.name} at ({target.x}, {target.y})")
+
+            try:
+                target_idx = int(input("Choose a target (number): ")) - 1
+            except ValueError:
+                print("Invalid input.")
+                continue
+
+            if 0 <= target_idx < len(targets):
+                target = targets[target_idx]
+                confirm = input(f"Confirm shooting {target.name}? (y/n): ").strip().lower()
+                if confirm == 'y':
+                    resolve_ranged_attacks(shooting_unit, target, board)
+                    remaining_units.remove(shooting_unit)
+                else:
+                    print("Cancelled. Returning to unit selection.")
+            else:
+                print("Invalid target.")
+        else:
+            print("Invalid choice.")
+
 
 def roll_damage(damage_value):
     if isinstance(damage_value, int):
@@ -16,104 +102,34 @@ def roll_damage(damage_value):
             return random.randint(1, 6) + random.randint(1, 6)
     return 1
 
-def shooting_phase(board, shooting_units, enemy_units):
-    for unit in shooting_units:
-        print(f"\nShooting Phase for {unit.name} (Team {unit.team})")
+def resolve_ranged_attacks(unit, target_unit, board):
+    if not hasattr(unit, "ranged_weapons") or not unit.ranged_weapons:
+        print(f"{unit.name} has no ranged weapons!")
+        return
 
-        in_combat = any(is_in_combat(model.x, model.y, board, unit.team) for model in unit.models)
+    print(f"\n{unit.name} is shooting at {target_unit.name}!")
+
+    for weapon in unit.ranged_weapons:
+        print(f"Using {weapon['name']}:")
 
         for model in unit.models:
-            attacks = getattr(model, 'ranged_attacks', [])
-            if not attacks:
-                continue
+            for _ in range(weapon["attacks"]):
+                hit = random.randint(1, 6)
+                print(f"  Rolled to hit: {hit} (needs {weapon['to_hit']}+)")
 
-            for weapon in attacks:
-                if in_combat and "shoot_in_combat" not in [k.lower() for k in weapon.get("keywords", [])]:
-                    print(f"{unit.name} is in combat and cannot shoot with {weapon['name']}.")
-                    continue
+                if hit >= weapon["to_hit"]:
+                    wound = random.randint(1, 6)
+                    print(f"  Rolled to wound: {wound} (needs {weapon['to_wound']}+)")
 
-                valid_targets = []
-                for enemy_unit in enemy_units:
-                    for target_model in enemy_unit.models:
-                        dx = target_model.x - model.x
-                        dy = target_model.y - model.y
-                        distance = math.sqrt(dx ** 2 + dy ** 2)
-                        if distance <= weapon["range"]:
-                            path = board.get_path(model.x, model.y, target_model.x, target_model.y)
-                            blocked, _ = board.is_path_blocked(path, (model.x, model.y), unit)
-                            if not blocked:
-                                valid_targets.append((enemy_unit, target_model))
-
-                if not valid_targets:
-                    print(f"No valid targets for {unit.name}'s {weapon['name']} from model at ({model.x}, {model.y}).")
-                    continue
-
-                if unit.team == 1:
-                    unit_targets = {}
-                    for enemy_unit, enemy_model in valid_targets:
-                        unit_targets.setdefault(enemy_unit.name, []).append((enemy_unit, enemy_model))
-
-                    print("\nChoose a target:")
-                    for i, unit_name in enumerate(unit_targets.keys()):
-                        print(f"{i + 1}. {unit_name}")
-
-                    while True:
-                        try:
-                            choice = int(input("Enter number of the unit to shoot: ")) - 1
-                            selected_name = list(unit_targets.keys())[choice]
-                            break
-                        except (ValueError, IndexError):
-                            print("Invalid choice. Try again.")
-
-                    selected_targets = unit_targets[selected_name]
-                    target_unit, target_model = selected_targets[0]
-                else:
-                    target_unit, target_model = valid_targets[0]
-
-                print(f"{unit.name} at ({model.x}, {model.y}) shoots {weapon['name']} at {target_unit.name} at ({target_model.x}, {target_model.y})")
-
-                num_attacks = roll_damage(weapon["attacks"])
-
-                for _ in range(num_attacks):
-                    hit_roll = random.randint(1, 6)
-                    auto_wound = "crit_auto_wound" in [k.lower() for k in weapon.get("keywords", [])] and hit_roll == 6
-
-                    if hit_roll >= weapon["to_hit"] or auto_wound:
-                        if not auto_wound:
-                            wound_roll = random.randint(1, 6)
-                            if wound_roll < weapon["to_wound"]:
-                                print("Failed to wound.")
-                                continue
+                    if wound >= weapon["to_wound"]:
+                        damage = weapon["damage"]
+                        enemy_model = target_unit.models[0] if target_unit.models else None
+                        if enemy_model:
+                            print(f"  {damage} damage dealt to model at ({enemy_model.x}, {enemy_model.y})")
+                            apply_damage(enemy_model, damage)
                         else:
-                            print("Critical hit! Auto-wound triggered.")
-
-                        save_value = getattr(target_unit, "save", 4)
-                        save_roll = random.randint(1, 6)
-                        if save_roll >= (save_value + weapon["rend"]):
-                            print("Target saved the wound!")
-                            continue
-
-                        ward_value = getattr(target_unit, "ward", None)
-                        if ward_value:
-                            ward_roll = random.randint(1, 6)
-                            if ward_roll >= ward_value:
-                                print("Ward save successful!")
-                                continue
-
-                        damage = roll_damage(weapon["damage"])
-                        print(f"{damage} damage dealt to {target_unit.name}!")
-
-                        for _ in range(damage):
-                            if not hasattr(target_model, 'wounds'):
-                                target_model.wounds = 0
-
-                            target_model.wounds += 1
-                            print(f"Damage assigned to model at ({target_model.x}, {target_model.y})")
-
-                            if target_model.wounds >= getattr(target_unit, 'health', 1):
-                                print(f"Model at ({target_model.x}, {target_model.y}) slain!")
-                                if target_model in target_unit.models:
-                                    target_unit.models.remove(target_model)
-                                break
+                            print("  No targets left in unit!")
                     else:
-                        print("Missed.")
+                        print("  Failed to wound.")
+                else:
+                    print("  Missed.")

@@ -12,7 +12,17 @@ class StormcastFactory(FactionFactory):
             "num_models" : 5,
             "base_width": 1.5,
             "base_height": 1.5,
-            "range": []
+            "range": [],
+            "melee_weapons": [
+            {
+            "name": "Warhammer",
+            "attacks": 2,
+            "to_hit": 3,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": 1
+            },
+            ]
         },
 
         "Prosecutors": {
@@ -34,6 +44,16 @@ class StormcastFactory(FactionFactory):
                     "damage": "D3",
                     "keywords": []
                 }
+            ],
+            "melee_weapons": [
+            {
+            "name": "Stormcall Javelin",
+            "attacks": 3,
+            "to_hit": 3,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": 1
+            },
             ]
         },
 
@@ -45,7 +65,25 @@ class StormcastFactory(FactionFactory):
             "num_models": 1,
             "base_width": 1.5,   # in inches
             "base_height": 1.5,   # use 2.0 or 2.5 for cavalry/mounted units
-            "range": []
+            "range": [],
+            "melee_weapons": [
+            {
+            "name": "Staff of Abjuration",
+            "attacks": 1,
+            "to_hit": 3,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": 3
+            },
+            {
+            "name": "Judgement Blade",
+            "attacks": 3,
+            "to_hit": 3,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": "d3"
+            },
+            ]
         },
 
         "Lord-Vigilant": {
@@ -56,7 +94,26 @@ class StormcastFactory(FactionFactory):
             "num_models": 1,
             "base_width": 2.0,   # in inches
             "base_height": 3.5,   # use 2.0 or 2.5 for cavalry/mounted units
-            "range": []
+            "range": [],
+            "melee_weapons": [
+            {
+            "name": "Hallowed Greataxe",
+            "attacks": 5,
+            "to_hit": 3,
+            "to_wound": 3,
+            "rend": 2,
+            "damage": 2
+            },
+            {
+            "name": "Gryph-Stalker's Beak and Talons",
+            "attacks": 3,
+            "to_hit": 4,
+            "to_wound": 3,
+            "rend": 1,
+            "damage": 2
+            },
+            ]
+            
         },
         
     }

@@ -4,8 +4,8 @@ from game_phases.movement_phase import player_movement_phase, ai_movement_phase
 from game_phases.charge_phase import charge_phase, ai_charge_phase
 from game_phases.deployment import deployment_phase
 from game_phases.victory_phase import process_end_phase_actions, calculate_victory_points
-from game_phases.shooting_phase import shooting_phase
-
+from game_phases.shooting_phase import player_shooting_phase
+from game_phases.combat_phase import combat_phase
 
 def main():
     print("Welcome to Spearhead: Skirmish for the Realms!")
@@ -70,10 +70,14 @@ def player_turn(board, player_units, ai_units, total_vp):
     player_movement_phase(board, player_units)
 
     # Shooting
-    shooting_phase(board, player_units, ai_units)
+    player_shooting_phase(board, player_units, ai_units)
+
 
     # Charge
     charge_phase(board, player_units)
+
+    # Combat
+    combat_phase(board, current_team=1, player_units=player_units, ai_units=ai_units)
 
     # End Phase Actions
     process_end_phase_actions(board, player_units)
@@ -92,6 +96,7 @@ def ai_turn(board, player_units, ai_units, total_vp):
     board.display_objective_status()
     ai_movement_phase(board, ai_units)
     ai_charge_phase(board, ai_units, player_units)
+    combat_phase(board, current_team=1, player_units=player_units, ai_units=ai_units)
     process_end_phase_actions(board, ai_units)
     print("\n[End of Round Objective Check]")
     board.update_objective_control()

@@ -61,7 +61,7 @@ class Unit:
         model_health = unit_data.get("health", 1)
 
         self.ranged_attacks = unit_data.get("range", [])
-        self.melee_attacks = unit_data.get("melee", [])
+        self.melee_weapons = unit_data.get("melee_weapons", [])
 
         leader_x = self.x
         leader_y = self.y
@@ -103,7 +103,12 @@ class Unit:
             label = "Leader" if i == 0 else f"Model {i}"
             print(f" - {label} at ({model.x}, {model.y}) | Base: {model.base_diameter}\"")
 
-    def apply_damage(self, dmg):
+    
+
+    def model_count(self):
+        return len(self.models)
+
+def apply_damage(self, dmg):
         for model in self.models:
             if model.is_alive():
                 model.take_damage(dmg)
@@ -113,9 +118,6 @@ class Unit:
                     self.models.remove(model)
                 break
         print(f"{self.name}: {len(self.models)} model(s) remaining.")
-
-    def model_count(self):
-        return len(self.models)
 
 def is_in_combat(x, y, board, team, radius=6):
     for enemy_unit in board.units:
