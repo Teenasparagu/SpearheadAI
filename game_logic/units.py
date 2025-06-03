@@ -103,12 +103,10 @@ class Unit:
             label = "Leader" if i == 0 else f"Model {i}"
             print(f" - {label} at ({model.x}, {model.y}) | Base: {model.base_diameter}\"")
 
-    
-
     def model_count(self):
         return len(self.models)
 
-def apply_damage(self, dmg):
+    def apply_damage(self, dmg):
         for model in self.models:
             if model.is_alive():
                 model.take_damage(dmg)
