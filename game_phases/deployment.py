@@ -2,7 +2,7 @@ import os
 import random
 import importlib
 import math
-from game_logic.units import Unit
+from game_logic.units import Unit, Model
 from game_logic.board import Objective
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
 from game_logic.board import TILE_OBJECTIVE
@@ -166,7 +166,9 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
                 except Exception as e:
                     log(f"⚠️ Error: {e}")
 
-def deploy_units(board, units, territory_bounds, zone_name, player_label, get_input, log):
+def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player_label, get_input, log):
+    zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if territory_bounds(i, j)]
+    enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_bounds(i, j)]
     for unit in units:
         if player_label.lower() == "ai":
             placed = False
@@ -175,15 +177,15 @@ def deploy_units(board, units, territory_bounds, zone_name, player_label, get_in
                 x = random.randint(0, board.width - 1)
                 y = random.randint(0, board.height - 1)
                 if territory_bounds(x, y):
-                    unit.x = x
-                    unit.y = y
-                    for model in unit.models:
-                        dx = x - unit.models[0].x
-                        dy = y - unit.models[0].y
-                        model.x += dx
-                        model.y += dy
-                    if all(0 <= mx < board.width and 0 <= my < board.height and board.grid[my][mx] == "-"
-                           for model in unit.models for mx, my in model.get_occupied_squares()):
+                    valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
+                    if valid:
+                        unit.x = x
+                        unit.y = y
+                        for model in unit.models:
+                            dx = x - unit.models[0].x
+                            dy = y - unit.models[0].y
+                            model.x += dx
+                            model.y += dy
                         board.place_unit(unit)
                         placed = True
                 attempts -= 1
@@ -194,10 +196,14 @@ def deploy_units(board, units, territory_bounds, zone_name, player_label, get_in
                 try:
                     x, y = map(int, get_input(f"Placing {unit.name} (leader model): Enter x y within your deployment zone:").split())
                     if territory_bounds(x, y):
-                        unit.x = x
-                        unit.y = y
-                        board.place_unit(unit)
-                        break
+                        valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
+                        if valid:
+                            unit.x = x
+                            unit.y = y
+                            board.place_unit(unit)
+                            break
+                        else:
+                            log("❌ Placement invalid.")
                     else:
                         log("❌ Not within your deployment zone.")
                 except ValueError:
@@ -235,4 +241,41 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
         for tx, ty in board.terrain:
             if math.hypot(px - tx, py - ty) < 12:
                 return False, (px, py)
+    return True, None
+
+def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
+    zone_set = set(zone)
+    enemy_set = set(enemy_zone)
+
+    dx = x - unit.models[0].x
+    dy = y - unit.models[0].y
+
+    new_positions = []
+    for model in unit.models:
+        mx = model.x + dx
+        my = model.y + dy
+        temp = Model(mx, my, base_diameter=model.base_diameter)
+        new_positions.append((mx, my, temp.get_occupied_squares()))
+
+    for _, _, squares in new_positions:
+        for px, py in squares:
+            if not (0 <= px < board.width and 0 <= py < board.height):
+                return False, (px, py)
+            if board.grid[py][px] != "-":
+                return False, (px, py)
+            if (px, py) not in zone_set:
+                return False, (px, py)
+            for ex, ey in enemy_set:
+                if math.hypot(px - ex, py - ey) < 12:
+                    return False, (px, py)
+
+    for i, (mx, my, _) in enumerate(new_positions):
+        coherent = False
+        for j, (ox, oy, _) in enumerate(new_positions):
+            if i != j and math.sqrt((mx - ox) ** 2 + (my - oy) ** 2) <= 2:
+                coherent = True
+                break
+        if not coherent:
+            return False, (mx, my)
+
     return True, None

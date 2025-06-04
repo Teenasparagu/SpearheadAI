@@ -198,13 +198,13 @@ def run_deployment_phase(game_state, board, get_input, log):
     if defender == "player":
         player_units = load_faction_force(player_faction, team_number=1)
         ai_units = load_faction_force(ai_faction, team_number=2)
-        deploy_units(board, player_units, defender_zone, zone_name, "Player", get_input, log)
-        deploy_units(board, ai_units, attacker_zone, zone_name, "AI", get_input, log)
+        deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player", get_input, log)
+        deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI", get_input, log)
     else:
         ai_units = load_faction_force(ai_faction, team_number=1)
         player_units = load_faction_force(player_faction, team_number=2)
-        deploy_units(board, ai_units, defender_zone, zone_name, "AI", get_input, log)
-        deploy_units(board, player_units, attacker_zone, zone_name, "Player", get_input, log)
+        deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI", get_input, log)
+        deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player", get_input, log)
 
     game_state.players["attacker"] = attacker
     game_state.players["defender"] = defender

@@ -157,6 +157,55 @@ class Board:
         print(f"{unit.name} moved to ({dest_x}, {dest_y}).")
         return True
 
+    def move_model(self, unit: Unit, model_idx: int, dest_x: int, dest_y: int):
+        """Move an individual model if the destination is valid."""
+        if model_idx < 0 or model_idx >= len(unit.models):
+            return False
+
+        model = unit.models[model_idx]
+
+        def _squares(x, y, diameter):
+            occ = []
+            radius = diameter / 2.0
+            tiles = int(round(radius / 0.5))
+            for dx in range(-tiles, tiles + 1):
+                for dy in range(-tiles, tiles + 1):
+                    if math.sqrt(dx**2 + dy**2) <= tiles + 0.01:
+                        occ.append((x + dx, y + dy))
+            return occ
+
+        new_squares = _squares(dest_x, dest_y, model.base_diameter)
+        current_squares = set(model.get_occupied_squares())
+        unit_squares = set()
+        for m in unit.models:
+            unit_squares.update(m.get_occupied_squares())
+
+        for x, y in new_squares:
+            if not (0 <= x < self.width and 0 <= y < self.height):
+                return False
+            if self.grid[y][x] != TILE_EMPTY and (x, y) not in unit_squares:
+                return False
+
+        coherent = False
+        for i, other in enumerate(unit.models):
+            if i == model_idx:
+                continue
+            if math.sqrt((dest_x - other.x) ** 2 + (dest_y - other.y) ** 2) <= 2:
+                coherent = True
+                break
+        if not coherent and len(unit.models) > 1:
+            return False
+
+        for x, y in current_squares:
+            self.grid[y][x] = TILE_EMPTY
+        for x, y in new_squares:
+            self.grid[y][x] = TILE_UNIT
+
+        model.x, model.y = dest_x, dest_y
+        if model_idx == 0:
+            unit.x, unit.y = dest_x, dest_y
+        return True
+
     def ai_move(self, unit: Unit):
         print(f"AI's turn for {unit.name}")
         attempts = 10
