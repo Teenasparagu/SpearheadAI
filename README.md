@@ -1,5 +1,6 @@
 # SpearheadAI
 
+ web_interface
 This project provides a basic game engine with a simple Flask UI.
 
 ## Launching the Flask UI
@@ -43,3 +44,4 @@ engine.board.move_unit(unit, unit.x + 1, unit.y)
 
 This snippet mirrors the behaviour exercised in the unit tests and can be used
 as a starting point for custom scripts.
+
