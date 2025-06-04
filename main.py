@@ -1,107 +1,130 @@
+"""Entry point for the Spearhead skirmish game."""
+
 import random
+
 from game_logic.board import Board
-from game_phases.movement_phase import player_movement_phase, ai_movement_phase
+from game_phases.movement_phase import (
+    player_movement_phase,
+    ai_movement_phase,
+)
 from game_phases.charge_phase import charge_phase, ai_charge_phase
 from game_phases.deployment import deployment_phase
-from game_phases.victory_phase import process_end_phase_actions, calculate_victory_points
+from game_phases.victory_phase import (
+    process_end_phase_actions,
+    calculate_victory_points,
+)
 from game_phases.shooting_phase import player_shooting_phase
 from game_phases.combat_phase import combat_phase
 
-def main():
-    print("Welcome to Spearhead: Skirmish for the Realms!")
-    print("==============================================")
-    print("The battlefield awaits your command.\n")
 
-    # Track total VPs
-    total_vp = {1: 0, 2: 0}
+class Game:
+    """Handle overall game flow."""
 
-    # Initialize game board
-    board = Board(width=60, height=44)
+    def __init__(self) -> None:
+        print("Welcome to Spearhead: Skirmish for the Realms!")
+        print("==============================================")
+        print("The battlefield awaits your command.\n")
 
-    # Deployment phase handles setup and initial priority
-    player_units, ai_units, current_priority = deployment_phase(board)
+        self.board = Board(width=60, height=44)
+        self.total_vp = {1: 0, 2: 0}
+        self.player_units, self.ai_units, self.current_priority = deployment_phase(
+            self.board
+        )
 
-    # Game Rounds
-    for round_num in range(1, 5):
-        print(f"\n=== Round {round_num} Begins ===")
+    def run(self) -> None:
+        """Play four rounds of the game."""
+        for round_num in range(1, 5):
+            print(f"\n=== Round {round_num} Begins ===")
+            if round_num > 1:
+                self._roll_off()
 
-        # Roll-off for priority from round 2 onward
-        if round_num > 1:
-            print("\nRolling off for priority...")
-            player_roll = random.randint(1, 6)
-            ai_roll = random.randint(1, 6)
-            print(f"You rolled a {player_roll}, AI rolled a {ai_roll}")
-
-            if player_roll > ai_roll:
-                choice = input("You win the roll-off. Go first or second? (first/second): ").strip().lower()
-                current_priority = "player" if choice == "first" else "ai"
-            elif ai_roll > player_roll:
-                current_priority = random.choice(["player", "ai"])
-                print(f"AI wins the roll-off and chooses to go {'first' if current_priority == 'ai' else 'second'}.")
+            if self.current_priority == "player":
+                self.player_turn()
+                self.ai_turn()
             else:
-                print("It's a tie! Player retains priority.")
+                self.ai_turn()
+                self.player_turn()
 
-        # Execute turns based on priority
-        if current_priority == "player":
-            player_turn(board, player_units, ai_units, total_vp)
-            ai_turn(board, player_units, ai_units, total_vp)
+        self._final_results()
+
+    # ------------------------------------------------------------------
+    # Phase helpers
+    def _roll_off(self) -> None:
+        """Determine priority for the round."""
+        print("\nRolling off for priority...")
+        player_roll = random.randint(1, 6)
+        ai_roll = random.randint(1, 6)
+        print(f"You rolled a {player_roll}, AI rolled a {ai_roll}")
+
+        if player_roll > ai_roll:
+            choice = input(
+                "You win the roll-off. Go first or second? (first/second): "
+            ).strip().lower()
+            self.current_priority = "player" if choice == "first" else "ai"
+        elif ai_roll > player_roll:
+            self.current_priority = random.choice(["player", "ai"])
+            print(
+                f"AI wins the roll-off and chooses to go {'first' if self.current_priority == 'ai' else 'second'}."
+            )
         else:
-            ai_turn(board, player_units, ai_units, total_vp)
-            player_turn(board, player_units, ai_units, total_vp)
+            print("It's a tie! Player retains priority.")
 
-    # Final results
-    print("\n=== Game Over ===")
-    print(f"Final Victory Points:\n  Player 1: {total_vp[1]}\n  Player 2: {total_vp[2]}")
-    if total_vp[1] > total_vp[2]:
-        print(">> Player 1 wins!")
-    elif total_vp[2] > total_vp[1]:
-        print(">> Player 2 wins!")
-    else:
-        print(">> It's a tie!")
+    def player_turn(self) -> None:
+        """Execute a player turn."""
+        print("\n-- Player Turn --")
+        self._objective_check()
+        player_movement_phase(self.board, self.player_units)
+        player_shooting_phase(self.board, self.player_units, self.ai_units)
+        charge_phase(self.board, self.player_units)
+        combat_phase(
+            self.board,
+            current_team=1,
+            player_units=self.player_units,
+            ai_units=self.ai_units,
+        )
+        process_end_phase_actions(self.board, self.player_units)
+        self._objective_check()
+        calculate_victory_points(self.board, self.total_vp, scoring_team=1)
 
-def player_turn(board, player_units, ai_units, total_vp):
-    print("\n-- Player Turn --")
+    def ai_turn(self) -> None:
+        """Execute the AI turn."""
+        print("\n-- AI Turn --")
+        self._objective_check()
+        ai_movement_phase(self.board, self.ai_units)
+        ai_charge_phase(self.board, self.ai_units, self.player_units)
+        combat_phase(
+            self.board,
+            current_team=1,
+            player_units=self.player_units,
+            ai_units=self.ai_units,
+        )
+        process_end_phase_actions(self.board, self.ai_units)
+        self._objective_check()
+        calculate_victory_points(self.board, self.total_vp, scoring_team=2)
 
-    print("\n[Start of Round Objective Check]")
-    board.update_objective_control()
-    board.display_objective_status()
+    def _objective_check(self) -> None:
+        self.board.update_objective_control()
+        self.board.display_objective_status()
 
-    # Movement
-    player_movement_phase(board, player_units)
+    def _final_results(self) -> None:
+        """Display final VP totals."""
+        print("\n=== Game Over ===")
+        print(
+            f"Final Victory Points:\n  Player 1: {self.total_vp[1]}\n  Player 2: {self.total_vp[2]}"
+        )
+        if self.total_vp[1] > self.total_vp[2]:
+            print(">> Player 1 wins!")
+        elif self.total_vp[2] > self.total_vp[1]:
+            print(">> Player 2 wins!")
+        else:
+            print(">> It's a tie!")
 
-    # Shooting
-    player_shooting_phase(board, player_units, ai_units)
 
 
-    # Charge
-    charge_phase(board, player_units)
+def main() -> None:
+    """Script entry point."""
+    Game().run()
 
-    # Combat
-    combat_phase(board, current_team=1, player_units=player_units, ai_units=ai_units)
-
-    # End Phase Actions
-    process_end_phase_actions(board, player_units)
-
-    print("\n[End of Round Objective Check]")
-    board.update_objective_control()
-    board.display_objective_status()
-
-    # Scoring
-    calculate_victory_points(board, total_vp, scoring_team=1)
-
-def ai_turn(board, player_units, ai_units, total_vp):
-    print("\n-- AI Turn --")
-    print("\n[Start of Round Objective Check]")
-    board.update_objective_control()
-    board.display_objective_status()
-    ai_movement_phase(board, ai_units)
-    ai_charge_phase(board, ai_units, player_units)
-    combat_phase(board, current_team=1, player_units=player_units, ai_units=ai_units)
-    process_end_phase_actions(board, ai_units)
-    print("\n[End of Round Objective Check]")
-    board.update_objective_control()
-    board.display_objective_status()
-    calculate_victory_points(board, total_vp, scoring_team=2)
 
 if __name__ == "__main__":
     main()
