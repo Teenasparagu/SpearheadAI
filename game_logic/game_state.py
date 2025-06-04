@@ -6,16 +6,22 @@ class GameState:
         self.board = board
         self.width = board.width
         self.height = board.height
-        self.units = board.units
-        self.objectives = board.objectives
         self.terrain = board.terrain
-
+        self.objectives = board.objectives
+        self.realm = None
+        self.map_layout = None
+        self.phase = "deployment"
         self.round = 1
-        self.current_priority = "player"  # or "ai"
+        self.current_priority = "player"
         self.total_vp = {1: 0, 2: 0}
-        self.player_units = []
-        self.ai_units = []
 
+        # New clean unit tracking
+        self.units = {"player": [], "ai": []}
+        self.players = {"attacker": None, "defender": None}
+        self.turn_order = []
+        self.current_turn_team = None
+
+        self.messages = []
 
     def to_grid_dict(self):
         grid = {}
@@ -51,7 +57,7 @@ class GameState:
                     grid[(obj.x, obj.y)]["control2"] = 1
 
         # Mark units and stats
-        for unit in self.units:
+        for unit in self.units["player"] + self.units["ai"]:
             for i, model in enumerate(unit.models):
                 if 0 <= model.x < self.width and 0 <= model.y < self.height:
                     tile = grid[(model.x, model.y)]
@@ -78,3 +84,6 @@ class GameState:
                 tensor[i, y, x] = features.get(key, 0)
 
         return tensor
+
+    def log_message(self, msg: str):
+        self.messages.append(msg)

@@ -106,7 +106,16 @@ class Unit:
     def model_count(self):
         return len(self.models)
 
-    def apply_damage(self, dmg):
+
+def is_in_combat(x, y, board, team, radius=6):
+    for enemy_unit in board.units:
+        if enemy_unit.team != team:
+            for model in enemy_unit.models:
+                if math.sqrt((x - model.x)**2 + (y - model.y)**2) < radius:
+                    return True
+    return False
+
+def apply_damage(self, dmg):
         for model in self.models:
             if model.is_alive():
                 model.take_damage(dmg)
@@ -116,11 +125,3 @@ class Unit:
                     self.models.remove(model)
                 break
         print(f"{self.name}: {len(self.models)} model(s) remaining.")
-
-def is_in_combat(x, y, board, team, radius=6):
-    for enemy_unit in board.units:
-        if enemy_unit.team != team:
-            for model in enemy_unit.models:
-                if math.sqrt((x - model.x)**2 + (y - model.y)**2) < radius:
-                    return True
-    return False

@@ -1,95 +1,127 @@
-from flask import Flask, render_template, request
-from game_phases.deployment import get_deployment_zones
-import random
+from flask import Flask, render_template, request, redirect, session
+from game_logic.board import Board
+from game_logic.game_state import GameState
+from game_logic.game_engine import GameEngine
+from game_phases.deployment import (
+    choose_faction, list_factions, roll_off, choose_battlefield,
+    get_objectives_for_battlefield, choose_deployment_map,
+    get_deployment_zones, deploy_terrain, deploy_units, load_faction_force
+)
+import math
 
 app = Flask(__name__)
+app.secret_key = "supersecret"  # Required for Flask session
 
-BOARD_WIDTH = 60
-BOARD_HEIGHT = 44
+# Initialize game
+game = GameEngine()
+game_state = game.game_state
+board = game.board
 
-# Global state variables
-player_faction = None
-roll_result = None
-selected_realm = None
-objectives = []
-deployment_map = None
-defender_zone_func = None
-attacker_zone_func = None
+# Shared prompt state
+input_sequence = []
+input_index = 0
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    global player_faction, roll_result, selected_realm, objectives
-    global deployment_map, defender_zone_func, attacker_zone_func
+@app.route("/game", methods=["GET", "POST"])
+def game_view():
+    global input_index
 
+    # Step 1: On first visit, setup the input sequence
+    if "initialized" not in session:
+        session["initialized"] = True
+        session["inputs"] = {}  # Store user inputs
+        input_index = 0
+        input_sequence.clear()
+        input_sequence.extend([
+            {"prompt": "Enter number:", "type": "faction", "label": "Choose your faction"},
+            {"prompt": "Choose attacker or defender (a/d):", "type": "attacker", "label": "Choose attacker or defender"},
+            {"prompt": "(a/g):", "type": "realm", "label": "Choose a realm (a = Aqshy, g = Ghyran)"},
+            {"prompt": "Enter 1 or 2:", "type": "map", "label": "Choose deployment map (1 = straight, 2 = diagonal)"},
+            {"prompt": "Do you want to go first or second?:", "type": "first_turn", "label": "First turn choice"}
+        ])
+
+    # Step 2: Handle submitted input
     if request.method == "POST":
-        action = request.form.get("action")
+        user_input = request.form.get("input")
+        prompt_key = input_sequence[input_index]["prompt"]
+        session["inputs"][prompt_key] = user_input
+        input_index += 1
 
-        if action == "select_faction":
-            player_faction = request.form.get("faction")
+        if input_index >= len(input_sequence):
+            # All inputs received — run deployment
+            inputs = session["inputs"]
 
-        elif action == "roll_off":
-            player_roll = random.randint(1, 6)
-            ai_roll = random.randint(1, 6)
-            if player_roll > ai_roll:
-                roll_result = f"You won the roll-off! (You: {player_roll}, AI: {ai_roll})"
-            elif ai_roll > player_roll:
-                roll_result = f"AI won the roll-off. (You: {player_roll}, AI: {ai_roll})"
-            else:
-                roll_result = f"It's a tie! (You: {player_roll}, AI: {ai_roll}) Roll again."
+            def get_input(prompt):
+                return inputs.get(prompt, "")
 
-        elif action == "select_realm":
-            selected_realm = request.form.get("realm")
-            if selected_realm == "Aqshy":
-                objectives = [(7, 7), (51, 7), (30, 22), (10, 38), (53, 38)]
-            elif selected_realm == "Ghyran":
-                objectives = [(1, 22), (30, 22), (58, 22), (15, 7), (45, 37)]
+            # Run deployment using stored inputs
+            from game_logic.game_engine import run_deployment_phase
+            run_deployment_phase(game_state, board, get_input)
 
-        elif action == "select_deployment_map":
-            deployment_map = request.form.get("map")
-            defender_zone_func, attacker_zone_func = get_deployment_zones(board=None, map_type=deployment_map)
+            return redirect("/grid")
 
-    # Calculate objective highlight radius (3" = 6 grid units)
-    highlighted = set()
-    for ox, oy in objectives:
-        for dx in range(-6, 7):
-            for dy in range(-6, 7):
-                x, y = ox + dx, oy + dy
-                if 0 <= x < BOARD_WIDTH and 0 <= y < BOARD_HEIGHT:
-                    if dx**2 + dy**2 <= 36:
-                        highlighted.add((x, y))
+    # Step 3: Get next prompt
+    current = input_sequence[input_index]
+    prompt_label = current["label"]
 
-    # Get deployment zones
-    team1_zone = set()
-    team2_zone = set()
+    # Build visual grid with priorities
+    grid_data = game_state.to_grid_dict()
+    display_grid = {}
+    map_type = game_state.map_layout or "straight"
+    defender_zone, attacker_zone = get_deployment_zones(board, map_type)
 
-    if defender_zone_func and attacker_zone_func:
-        for x in range(BOARD_WIDTH):
-            for y in range(BOARD_HEIGHT):
-                if defender_zone_func(x, y):
-                    team1_zone.add((x, y))
-                elif attacker_zone_func(x, y):
-                    team2_zone.add((x, y))
+    for y in range(board.height):
+        for x in range(board.width):
+            tile = grid_data[(x, y)]
+            color = "white"
+            label = ""
 
-    print("DEBUG STATE:")
-    print(f"player_faction = {player_faction}")
-    print(f"roll_result = {roll_result}")
-    print(f"selected_realm = {selected_realm}")
-    print(f"deployment_map = {deployment_map}")
+            if defender_zone(x, y):
+                color = "#d0e6ff"
+            if attacker_zone(x, y):
+                color = "#ffd0d0"
+            for obj in board.objectives:
+                if math.hypot(x - obj.x, y - obj.y) <= 6:
+                    if obj.control_team == 1:
+                        color = "#a0c4ff"
+                        label = "O"
+                    elif obj.control_team == 2:
+                        color = "#ffb3b3"
+                        label = "O"
+                    else:
+                        color = "#d9d9d9"
+                        label = "O"
+            if tile["terrain"]:
+                color = "black"
+                label = "T"
+            if tile["leader1"]:
+                color = "#0044cc"
+                label = "L"
+            elif tile["team1"]:
+                color = "#3399ff"
+                label = "U"
+            elif tile["leader2"]:
+                color = "#cc0000"
+                label = "L"
+            elif tile["team2"]:
+                color = "#ff6666"
+                label = "U"
 
+            display_grid[(x, y)] = {"color": color, "label": label}
 
     return render_template(
-        "index.html",
-        width=BOARD_WIDTH,
-        height=BOARD_HEIGHT,
-        player_faction=player_faction,
-        roll_result=roll_result,
-        selected_realm=selected_realm,
-        deployment_map=deployment_map,
-        objectives=objectives,
-        highlighted=highlighted,
-        team1_zone=team1_zone,
-        team2_zone=team2_zone
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label=prompt_label,
+        messages=game_state.messages
     )
 
+@app.route("/reset")
+def reset_game():
+    session.clear()
+    game.__init__()  # Re-initialize the game engine
+    return redirect("/game")
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    app.run(debug=True)
