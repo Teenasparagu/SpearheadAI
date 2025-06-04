@@ -4,6 +4,7 @@ from game_logic.game_state import GameState
 from game_logic.game_engine import GameEngine
 from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
+from game_logic.utils import _simple_deploy_units
 import math
 
 app = Flask(__name__)
@@ -24,22 +25,6 @@ def index():
     """Redirect the root URL to the game view."""
     return redirect("/game")
 
-
-def _simple_deploy_units(board, units, territory, zone_name, player_label, get_input=None, log=lambda *a, **k: None):
-    """Simplified unit placement used by the web UI."""
-    for idx, unit in enumerate(units):
-        if player_label.lower() == "player":
-            unit.x = 1
-            unit.y = 1 + idx * 10
-        else:
-            unit.x = board.width - 2
-            unit.y = board.height - 2 - idx * 10
-        for model in unit.models:
-            dx = unit.x - unit.models[0].x
-            dy = unit.y - unit.models[0].y
-            model.x += dx
-            model.y += dy
-        board.place_unit(unit)
 
 
 def run_web_deployment_phase(game_state, board, inputs):
