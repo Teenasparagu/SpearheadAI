@@ -1,10 +1,12 @@
 import math
+from dataclasses import dataclass
 
+
+@dataclass
 class Objective:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.control_team = None
+    x: int
+    y: int
+    control_team: int | None = None
 
     def get_control_team(self, units):
         control_player_1 = 0
