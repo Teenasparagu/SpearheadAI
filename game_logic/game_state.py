@@ -23,6 +23,12 @@ class GameState:
 
         self.messages = []
 
+        # Deployment helpers for web UI
+        self.pending_units = []
+        self.player_zone = set()
+        self.enemy_zone = set()
+        self.pending_first = None
+
     def to_grid_dict(self):
         grid = {}
 

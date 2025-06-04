@@ -15,3 +15,11 @@ def _simple_deploy_units(board, units, territory, zone_name, player_label, get_i
             model.y += dy
         board.place_unit(unit)
 
+
+def within_enemy_buffer(x, y, enemy_zone, buffer=12):
+    """Check if a coordinate is within the buffer distance of the enemy territory."""
+    for ex, ey in enemy_zone:
+        if ((x - ex) ** 2 + (y - ey) ** 2) ** 0.5 < buffer:
+            return True
+    return False
+

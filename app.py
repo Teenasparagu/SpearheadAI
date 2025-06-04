@@ -8,7 +8,7 @@ from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
 from game_phases.movement_phase import player_unit_move, attempt_move
 from game_logic.units import is_in_combat
-from game_logic.utils import _simple_deploy_units
+from game_logic.utils import _simple_deploy_units, within_enemy_buffer
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
@@ -145,7 +145,7 @@ def run_web_deployment_phase(game_state, board, inputs):
     game_state.log_message("Deployment phase complete.")
 
 
-def apply_partial_deployment(game_state, board, inputs, final=False):
+def apply_partial_deployment(game_state, board, inputs, final=False, manual=False):
     """Update game state based on partially collected deployment inputs."""
     factions = deployment.list_factions()
 
@@ -194,28 +194,49 @@ def apply_partial_deployment(game_state, board, inputs, final=False):
         if defender == "player":
             player_units = deployment.load_faction_force(player_faction, team_number=1)
             ai_units = deployment.load_faction_force(ai_faction, team_number=2)
-            _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
-            _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+            if manual:
+                _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+            else:
+                _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
+                _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
         else:
             ai_units = deployment.load_faction_force(ai_faction, team_number=1)
             player_units = deployment.load_faction_force(player_faction, team_number=2)
-            _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
-            _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+            if manual:
+                _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
+            else:
+                _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
+                _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
 
-        game_state.units["player"] = player_units
-        game_state.units["ai"] = ai_units
-
-        if attacker == "player":
-            first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
-            first = "player" if first_choice.startswith("first") else "ai"
+        if manual:
+            game_state.units["ai"] = ai_units
+            game_state.units["player"] = []
+            game_state.pending_units = player_units
+            game_state.player_zone = {(x, y) for x in range(board.width) for y in range(board.height) if (defender_zone if defender == "player" else attacker_zone)(x, y)}
+            game_state.enemy_zone = {(x, y) for x in range(board.width) for y in range(board.height) if (attacker_zone if defender == "player" else defender_zone)(x, y)}
+            if attacker == "player":
+                first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
+                game_state.pending_first = "player" if first_choice.startswith("first") else "ai"
+            else:
+                game_state.pending_first = "ai"
+                game_state.log_message("AI chooses ai to go first.")
+            game_state.phase = "deployment"
+            game_state.log_message("Place your units on the board.")
         else:
-            first = "ai"
-            game_state.log_message("AI chooses ai to go first.")
+            game_state.units["player"] = player_units
+            game_state.units["ai"] = ai_units
 
-        game_state.phase = "hero"
-        game_state.turn_order = [first, "ai" if first == "player" else "player"]
-        game_state.log_message(f"{first.capitalize()} will take the first turn.")
-        game_state.log_message("Deployment phase complete.")
+            if attacker == "player":
+                first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
+                first = "player" if first_choice.startswith("first") else "ai"
+            else:
+                first = "ai"
+                game_state.log_message("AI chooses ai to go first.")
+
+            game_state.phase = "hero"
+            game_state.turn_order = [first, "ai" if first == "player" else "player"]
+            game_state.log_message(f"{first.capitalize()} will take the first turn.")
+            game_state.log_message("Deployment phase complete.")
 
 
 @app.route("/game", methods=["GET", "POST"])
@@ -275,13 +296,13 @@ def game_view():
 
         if input_index >= len(input_sequence):
             inputs = session["inputs"]
-            apply_partial_deployment(game_state, board, inputs, final=True)
+            apply_partial_deployment(game_state, board, inputs, final=True, manual=True)
             _save_game(game)
-            return redirect("/grid")
+            return redirect("/deploy")
 
     # Step 3: Get next prompt
     if input_index >= len(input_sequence):
-        return redirect("/grid")
+        return redirect("/deploy")
 
     current = input_sequence[input_index]
     prompt_label = current["label"]
@@ -324,7 +345,97 @@ def display_grid():
         width=board.width,
         height=board.height,
         messages=game_state.messages,
+        prompt_label=None,
+        clickable=False,
+        click_url="/deploy"
     )
+    _save_game(game)
+    return response
+
+
+@app.route("/deploy", methods=["GET", "POST"])
+def deploy_view():
+    game = _load_game()
+    gs = game.game_state
+    board = game.board
+
+    if gs.phase != "deployment" or not gs.pending_units:
+        return redirect("/grid")
+
+    state = session.get("deploy_state", {"unit_idx": 0, "stage": "select"})
+    units = gs.pending_units
+
+    if state["unit_idx"] >= len(units):
+        gs.units["player"] = units
+        gs.phase = "hero"
+        first = gs.pending_first or "player"
+        gs.turn_order = [first, "ai" if first == "player" else "player"]
+        gs.log_message("Deployment phase complete.")
+        session.pop("deploy_state", None)
+        _save_game(game)
+        return redirect("/grid")
+
+    unit = units[state["unit_idx"]]
+
+    if request.method == "POST" and state.get("stage") == "confirm":
+        action = request.form.get("action")
+        if action == "confirm":
+            state["unit_idx"] += 1
+            state["stage"] = "select"
+            state.pop("prev", None)
+        else:
+            board.remove_unit(unit)
+            prev = state.get("prev")
+            if prev:
+                for m, (ox, oy) in zip(unit.models, prev):
+                    m.x, m.y = ox, oy
+            state["stage"] = "select"
+            state.pop("prev", None)
+
+    elif request.method == "GET" and "x" in request.args and "y" in request.args and state.get("stage") == "select":
+        x = int(request.args.get("x"))
+        y = int(request.args.get("y"))
+        if (x, y) not in gs.player_zone:
+            gs.log_message("❌ Not within your deployment zone.")
+        else:
+            dx = x - unit.models[0].x
+            dy = y - unit.models[0].y
+            too_close = False
+            for m in unit.models:
+                nx, ny = m.x + dx, m.y + dy
+                if within_enemy_buffer(nx, ny, gs.enemy_zone):
+                    too_close = True
+                    break
+            if too_close:
+                gs.log_message("❌ Cannot deploy within 6\" of enemy territory.")
+            else:
+                prev = [(m.x, m.y) for m in unit.models]
+                for m in unit.models:
+                    m.x += dx
+                    m.y += dy
+                if board.place_unit(unit):
+                    state["stage"] = "confirm"
+                    state["prev"] = prev
+                else:
+                    for m, (ox, oy) in zip(unit.models, prev):
+                        m.x, m.y = ox, oy
+                    gs.log_message("❌ Invalid placement.")
+
+    session["deploy_state"] = state
+    prompt_label = f"Place {unit.name} (click board)" if state.get("stage") == "select" else f"Confirm {unit.name}?"
+    display_grid = build_display_grid(gs, board)
+    response = render_template(
+        "grid.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        messages=gs.messages,
+        prompt_label=prompt_label,
+        clickable=state.get("stage") == "select",
+        click_url="/deploy",
+    )
+    if state.get("stage") == "confirm":
+        response = response.replace("</body>", "<form method='POST' style='text-align:center;'><button name='action' value='confirm'>Confirm</button> <button name='action' value='redo'>Reposition</button></form></body>")
     _save_game(game)
     return response
 

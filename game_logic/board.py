@@ -81,6 +81,16 @@ class Board:
         print(f"{unit.name} placed successfully.")
         return True
 
+    def remove_unit(self, unit: Unit):
+        """Remove a previously placed unit from the board."""
+        if unit in self.units:
+            self.units.remove(unit)
+            for model in unit.models:
+                for x, y in model.get_occupied_squares():
+                    if 0 <= x < self.width and 0 <= y < self.height:
+                        if self.grid[y][x] == TILE_UNIT:
+                            self.grid[y][x] = TILE_EMPTY
+
     def get_path(self, start_x, start_y, end_x, end_y):
         path = []
         x1, y1 = start_x, start_y
