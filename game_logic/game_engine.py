@@ -115,6 +115,33 @@ class GameEngine:
 
         self.game_state.round += 1
 
+    def deployment_phase(self, get_input=input, log=print):
+        """Run the deployment phase."""
+        run_deployment_phase(self.game_state, self.board, get_input, log)
+
+    def run_game(self, rounds=4, get_input=input, log=print):
+        """Run a complete game via the CLI interface."""
+        log("Welcome to Spearhead: Skirmish for the Realms!")
+        log("==============================================")
+        log("The battlefield awaits your command.\n")
+
+        run_deployment_phase(self.game_state, self.board, get_input, log)
+
+        for _ in range(1, rounds + 1):
+            self.run_round(get_input, log)
+
+        log("\n=== Game Over ===")
+        log(
+            f"Final Victory Points:\n  Player 1: {self.game_state.total_vp[1]}\n"
+            f"Player 2: {self.game_state.total_vp[2]}"
+        )
+        if self.game_state.total_vp[1] > self.game_state.total_vp[2]:
+            log(">> Player 1 wins!")
+        elif self.game_state.total_vp[2] > self.game_state.total_vp[1]:
+            log(">> Player 2 wins!")
+        else:
+            log(">> It's a tie!")
+
 
 def run_deployment_phase(game_state, board, get_input, log):
 
@@ -125,7 +152,7 @@ def run_deployment_phase(game_state, board, get_input, log):
     log(f"AI will play: {ai_faction.title()}")
 
     # Roll-Off
-    attacker, defender = roll_off()
+    attacker, defender = roll_off(get_input, log)
     log(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
 
     # Placeholder enhancement step
