@@ -1,12 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from game_logic.board import Board
 from game_logic.game_state import GameState
-from game_logic.game_engine import GameEngine
-from game_phases.deployment import (
-    choose_faction, list_factions, roll_off, choose_battlefield,
-    get_objectives_for_battlefield, choose_deployment_map,
-    get_deployment_zones, deploy_terrain, deploy_units, load_faction_force
-)
+from game_logic.game_engine import GameEngine, run_deployment_phase
+from game_phases.deployment import get_deployment_zones
 import math
 
 app = Flask(__name__)
@@ -54,7 +50,6 @@ def game_view():
                 return inputs.get(prompt, "")
 
             # Run deployment using stored inputs
-            from game_logic.game_engine import run_deployment_phase
             run_deployment_phase(game_state, board, get_input)
 
             return redirect("/grid")

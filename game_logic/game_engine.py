@@ -18,77 +18,6 @@ class GameEngine:
         self.current_priority = "player"
         self.setup_complete = False
 
-    def run_deployment_phase(game_state, board, get_input):
-        log = game_state.log_message  # short alias
-
-        # Faction Selection
-        player_faction = choose_faction(get_input, log)
-        ai_faction = random.choice([f for f in list_factions() if f != player_faction])
-        log(f"You chose: {player_faction.title()}")
-        log(f"AI will play: {ai_faction.title()}")
-
-        # Roll-Off
-        attacker, defender = roll_off()
-        log(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
-
-        # Placeholder enhancement step
-        log("Choosing regiment abilities and enhancements... (placeholder)")
-
-        # Realm & Objective Placement
-        battlefield = choose_battlefield(get_input, log)
-        game_state.realm = battlefield
-        board.objectives = get_objectives_for_battlefield(battlefield)
-        game_state.objectives = board.objectives
-        log(f"Objectives placed for {battlefield.title()}:")
-        for obj in board.objectives:
-            log(f" - ({obj.x}, {obj.y})")
-
-        # Deployment Map
-        deployment_map = choose_deployment_map(get_input, log)
-        game_state.map_layout = deployment_map
-        zone_name = deployment_map
-        defender_zone, attacker_zone = get_deployment_zones(board, deployment_map)
-
-        # Terrain
-        defender_team = 1 if defender == "player" else 2
-        attacker_team = 1 if attacker == "player" else 2
-
-        deploy_terrain(board, team=defender_team, zone=[
-            (x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)
-        ])
-        deploy_terrain(board, team=attacker_team, zone=[
-            (x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)
-        ])
-
-        # Units
-        if defender == "player":
-            player_units = load_faction_force(player_faction, team_number=1)
-            ai_units = load_faction_force(ai_faction, team_number=2)
-            deploy_units(board, player_units, defender_zone, zone_name, "Player")
-            deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
-        else:
-            ai_units = load_faction_force(ai_faction, team_number=1)
-            player_units = load_faction_force(player_faction, team_number=2)
-            deploy_units(board, ai_units, defender_zone, zone_name, "AI")
-            deploy_units(board, player_units, attacker_zone, zone_name, "Player")
-
-        game_state.players["attacker"] = attacker
-        game_state.players["defender"] = defender
-        game_state.units["player"] = player_units
-        game_state.units["ai"] = ai_units
-
-        # Determine First Turn
-        if attacker == "player":
-            choice = get_input("Do you want to go first or second? (first/second): ").strip().lower()
-            first = "player" if choice == "first" else "ai"
-        else:
-            first = random.choice(["ai", "player"])
-            log(f"AI chooses {first} to go first.")
-
-        game_state.phase = "hero"
-        game_state.turn_order = [first, "ai" if first == "player" else "player"]
-        log(f"{first.capitalize()} will take the first turn.")
-        log("Deployment phase complete.")
 
     def step(self, action_dict):
         """
@@ -111,3 +40,76 @@ class GameEngine:
         self.round += 1
         self.board.update_objective_control()
         # Possibly roll for new priority
+
+
+def run_deployment_phase(game_state, board, get_input):
+    log = game_state.log_message  # short alias
+
+    # Faction Selection
+    player_faction = choose_faction(get_input, log)
+    ai_faction = random.choice([f for f in list_factions() if f != player_faction])
+    log(f"You chose: {player_faction.title()}")
+    log(f"AI will play: {ai_faction.title()}")
+
+    # Roll-Off
+    attacker, defender = roll_off()
+    log(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
+
+    # Placeholder enhancement step
+    log("Choosing regiment abilities and enhancements... (placeholder)")
+
+    # Realm & Objective Placement
+    battlefield = choose_battlefield(get_input, log)
+    game_state.realm = battlefield
+    board.objectives = get_objectives_for_battlefield(battlefield)
+    game_state.objectives = board.objectives
+    log(f"Objectives placed for {battlefield.title()}:")
+    for obj in board.objectives:
+        log(f" - ({obj.x}, {obj.y})")
+
+    # Deployment Map
+    deployment_map = choose_deployment_map(get_input, log)
+    game_state.map_layout = deployment_map
+    zone_name = deployment_map
+    defender_zone, attacker_zone = get_deployment_zones(board, deployment_map)
+
+    # Terrain
+    defender_team = 1 if defender == "player" else 2
+    attacker_team = 1 if attacker == "player" else 2
+
+    deploy_terrain(board, team=defender_team, zone=[
+        (x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)
+    ])
+    deploy_terrain(board, team=attacker_team, zone=[
+        (x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)
+    ])
+
+    # Units
+    if defender == "player":
+        player_units = load_faction_force(player_faction, team_number=1)
+        ai_units = load_faction_force(ai_faction, team_number=2)
+        deploy_units(board, player_units, defender_zone, zone_name, "Player")
+        deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+    else:
+        ai_units = load_faction_force(ai_faction, team_number=1)
+        player_units = load_faction_force(player_faction, team_number=2)
+        deploy_units(board, ai_units, defender_zone, zone_name, "AI")
+        deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+
+    game_state.players["attacker"] = attacker
+    game_state.players["defender"] = defender
+    game_state.units["player"] = player_units
+    game_state.units["ai"] = ai_units
+
+    # Determine First Turn
+    if attacker == "player":
+        choice = get_input("Do you want to go first or second? (first/second): ").strip().lower()
+        first = "player" if choice == "first" else "ai"
+    else:
+        first = random.choice(["ai", "player"])
+        log(f"AI chooses {first} to go first.")
+
+    game_state.phase = "hero"
+    game_state.turn_order = [first, "ai" if first == "player" else "player"]
+    log(f"{first.capitalize()} will take the first turn.")
+    log("Deployment phase complete.")
