@@ -23,3 +23,23 @@ def within_enemy_buffer(x, y, enemy_zone, buffer=12):
             return True
     return False
 
+
+def valid_model_position(model, board, enemy_zone, placed):
+    """Check if a model can be placed at its current coords."""
+    from game_logic.board import TILE_EMPTY
+
+    for x, y in model.get_occupied_squares():
+        if not (0 <= x < board.width and 0 <= y < board.height):
+            return False
+        if board.grid[y][x] != TILE_EMPTY:
+            return False
+
+    if within_enemy_buffer(model.x, model.y, enemy_zone):
+        return False
+
+    if placed:
+        import math
+        if not any(math.hypot(model.x - p.x, model.y - p.y) <= 2 for p in placed):
+            return False
+    return True
+

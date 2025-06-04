@@ -8,7 +8,7 @@ from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
 from game_phases.movement_phase import player_unit_move, attempt_move
 from game_logic.units import is_in_combat
-from game_logic.utils import _simple_deploy_units, within_enemy_buffer
+from game_logic.utils import _simple_deploy_units, within_enemy_buffer, valid_model_position
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
@@ -377,20 +377,31 @@ def deploy_view():
 
     unit = units[state["unit_idx"]]
 
-    if request.method == "POST" and state.get("stage") == "confirm":
+    if request.method == "POST" and state.get("stage") in {"confirm", "confirm_individual"}:
         action = request.form.get("action")
         if action == "confirm":
             state["unit_idx"] += 1
             state["stage"] = "select"
-            state.pop("prev", None)
-        else:
+            for k in ("prev", "model_idx", "placed"):
+                state.pop(k, None)
+        elif action in {"redo", "restart"}:
             board.remove_unit(unit)
             prev = state.get("prev")
             if prev:
                 for m, (ox, oy) in zip(unit.models, prev):
                     m.x, m.y = ox, oy
             state["stage"] = "select"
-            state.pop("prev", None)
+            for k in ("prev", "model_idx", "placed"):
+                state.pop(k, None)
+        elif action == "individual" and state.get("stage") == "confirm":
+            board.remove_unit(unit)
+            prev = state.get("prev")
+            if prev:
+                for m, (ox, oy) in zip(unit.models, prev):
+                    m.x, m.y = ox, oy
+            state["stage"] = "model"
+            state["model_idx"] = 0
+            state["placed"] = []
 
     elif request.method == "GET" and "x" in request.args and "y" in request.args and state.get("stage") == "select":
         x = int(request.args.get("x"))
@@ -421,8 +432,38 @@ def deploy_view():
                         m.x, m.y = ox, oy
                     gs.log_message("❌ Invalid placement.")
 
+    elif request.method == "GET" and "x" in request.args and "y" in request.args and state.get("stage") == "model":
+        idx = state.get("model_idx", 0)
+        x = int(request.args.get("x"))
+        y = int(request.args.get("y"))
+        model = unit.models[idx]
+        ox, oy = model.x, model.y
+        model.x, model.y = x, y
+        placed = unit.models[:idx]
+        if valid_model_position(model, board, gs.enemy_zone, placed) and all(valid_model_position(m, board, gs.enemy_zone, placed[:i]) for i, m in enumerate(placed)):
+            idx += 1
+            state["model_idx"] = idx
+            if idx >= len(unit.models):
+                if board.place_unit(unit):
+                    state["stage"] = "confirm_individual"
+                else:
+                    gs.log_message("❌ Invalid placement.")
+                    for m, (px, py) in zip(unit.models, state["prev"]):
+                        m.x, m.y = px, py
+                    state["stage"] = "select"
+                    board.remove_unit(unit)
+        else:
+            model.x, model.y = ox, oy
+            gs.log_message("❌ Invalid placement.")
+
     session["deploy_state"] = state
-    prompt_label = f"Place {unit.name} (click board)" if state.get("stage") == "select" else f"Confirm {unit.name}?"
+    stage = state.get("stage")
+    if stage == "select":
+        prompt_label = f"Place {unit.name} (click board)"
+    elif stage == "model":
+        prompt_label = f"Place model {state.get('model_idx',0)+1} of {unit.name}"
+    else:
+        prompt_label = f"Confirm {unit.name}?"
     display_grid = build_display_grid(gs, board)
     response = render_template(
         "grid.html",
@@ -431,11 +472,19 @@ def deploy_view():
         height=board.height,
         messages=gs.messages,
         prompt_label=prompt_label,
-        clickable=state.get("stage") == "select",
+        clickable=stage in {"select", "model"},
         click_url="/deploy",
     )
-    if state.get("stage") == "confirm":
-        response = response.replace("</body>", "<form method='POST' style='text-align:center;'><button name='action' value='confirm'>Confirm</button> <button name='action' value='redo'>Reposition</button></form></body>")
+    if stage == "confirm":
+        response = response.replace(
+            "</body>",
+            "<form method='POST' style='text-align:center;'><button name='action' value='confirm'>Confirm</button> <button name='action' value='redo'>Reposition</button> <button name='action' value='individual'>Adjust Models</button></form></body>"
+        )
+    elif stage == "confirm_individual":
+        response = response.replace(
+            "</body>",
+            "<form method='POST' style='text-align:center;'><button name='action' value='confirm'>Confirm</button> <button name='action' value='restart'>Restart</button></form></body>"
+        )
     _save_game(game)
     return response
 
