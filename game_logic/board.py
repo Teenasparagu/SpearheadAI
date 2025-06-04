@@ -114,6 +114,14 @@ class Board:
         path.append((x2, y2))
         return path
 
+    def is_path_clear(self, start_x, start_y, end_x, end_y):
+        """Check if the straight line between two points is unobstructed."""
+        path = self.get_path(start_x, start_y, end_x, end_y)
+        for x, y in path[1:-1]:  # ignore start and destination tiles
+            if self.grid[y][x] not in (TILE_EMPTY, TILE_OBJECTIVE):
+                return False
+        return True
+
     def is_path_blocked(self, path, start_pos, unit=None):
         for x, y in path:
             if (x, y) != start_pos:
