@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from game_logic.board import Board
 from game_logic.game_state import GameState
-from game_logic.game_engine import GameEngine, run_deployment_phase
+from game_logic.game_engine import GameEngine
+from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
 import math
 
@@ -16,6 +17,88 @@ board = game.board
 # Shared prompt state
 input_sequence = []
 input_index = 0
+
+
+@app.route("/")
+def index():
+    """Redirect the root URL to the game view."""
+    return redirect("/game")
+
+
+def _simple_deploy_units(board, units, territory, zone_name, player_label, get_input=None, log=lambda *a, **k: None):
+    """Simplified unit placement used by the web UI."""
+    for idx, unit in enumerate(units):
+        if player_label.lower() == "player":
+            unit.x = 1
+            unit.y = 1 + idx * 10
+        else:
+            unit.x = board.width - 2
+            unit.y = board.height - 2 - idx * 10
+        for model in unit.models:
+            dx = unit.x - unit.models[0].x
+            dy = unit.y - unit.models[0].y
+            model.x += dx
+            model.y += dy
+        board.place_unit(unit)
+
+
+def run_web_deployment_phase(game_state, board, inputs):
+    """Run a trimmed deployment phase using values collected from the web UI."""
+    factions = deployment.list_factions()
+    choice = int(inputs.get("Enter number:", "1"))
+    player_faction = factions[max(0, choice - 1)]
+    ai_faction = [f for f in factions if f != player_faction][0]
+    game_state.log_message(f"You chose: {player_faction.title()}")
+    game_state.log_message(f"AI will play: {ai_faction.title()}")
+
+    role = inputs.get("Choose attacker or defender (a/d):", "a").strip().lower()
+    attacker = "player" if role == "a" else "ai"
+    defender = "ai" if attacker == "player" else "player"
+    game_state.log_message(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
+
+    realm_choice = inputs.get("(a/g):", "a").strip().lower()
+    battlefield = "ghyran" if realm_choice == "g" else "aqshy"
+    game_state.realm = battlefield
+    board.objectives = deployment.get_objectives_for_battlefield(battlefield)
+    game_state.objectives = board.objectives
+    game_state.log_message(f"Objectives placed for {battlefield.title()}:")
+    for obj in board.objectives:
+        game_state.log_message(f" - ({obj.x}, {obj.y})")
+
+    map_choice = inputs.get("Enter 1 or 2:", "1").strip()
+    deployment_map = "diagonal" if map_choice == "2" else "straight"
+    game_state.map_layout = deployment_map
+    zone_name = deployment_map
+    defender_zone, attacker_zone = deployment.get_deployment_zones(board, deployment_map)
+
+    if defender == "player":
+        player_units = deployment.load_faction_force(player_faction, team_number=1)
+        ai_units = deployment.load_faction_force(ai_faction, team_number=2)
+        _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
+        _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+    else:
+        ai_units = deployment.load_faction_force(ai_faction, team_number=1)
+        player_units = deployment.load_faction_force(player_faction, team_number=2)
+        _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
+        _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+
+    game_state.players["attacker"] = attacker
+    game_state.players["defender"] = defender
+    game_state.units["player"] = player_units
+    game_state.units["ai"] = ai_units
+
+    if attacker == "player":
+        first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
+        first = "player" if first_choice.startswith("first") else "ai"
+    else:
+        first = "ai"
+        game_state.log_message("AI chooses ai to go first.")
+
+    game_state.phase = "hero"
+    game_state.turn_order = [first, "ai" if first == "player" else "player"]
+    game_state.log_message(f"{first.capitalize()} will take the first turn.")
+    game_state.log_message("Deployment phase complete.")
+
 
 @app.route("/game", methods=["GET", "POST"])
 def game_view():
@@ -46,11 +129,8 @@ def game_view():
             # All inputs received — run deployment
             inputs = session["inputs"]
 
-            def get_input(prompt):
-                return inputs.get(prompt, "")
-
-            # Run deployment using stored inputs
-            run_deployment_phase(game_state, board, get_input, game_state.log_message)
+            # Run a simplified deployment using stored inputs
+            run_web_deployment_phase(game_state, board, inputs)
 
             return redirect("/grid")
 
@@ -117,6 +197,62 @@ def reset_game():
     session.clear()
     game.__init__()  # Re-initialize the game engine
     return redirect("/game")
+
+
+@app.route("/grid")
+def display_grid():
+    """Display the current game board after setup."""
+    grid_data = game_state.to_grid_dict()
+    display_grid = {}
+    map_type = game_state.map_layout or "straight"
+    defender_zone, attacker_zone = get_deployment_zones(board, map_type)
+
+    for y in range(board.height):
+        for x in range(board.width):
+            tile = grid_data[(x, y)]
+            color = "white"
+            label = ""
+
+            if defender_zone(x, y):
+                color = "#d0e6ff"
+            if attacker_zone(x, y):
+                color = "#ffd0d0"
+            for obj in board.objectives:
+                if math.hypot(x - obj.x, y - obj.y) <= 6:
+                    if obj.control_team == 1:
+                        color = "#a0c4ff"
+                        label = "O"
+                    elif obj.control_team == 2:
+                        color = "#ffb3b3"
+                        label = "O"
+                    else:
+                        color = "#d9d9d9"
+                        label = "O"
+            if tile["terrain"]:
+                color = "black"
+                label = "T"
+            if tile["leader1"]:
+                color = "#0044cc"
+                label = "L"
+            elif tile["team1"]:
+                color = "#3399ff"
+                label = "U"
+            elif tile["leader2"]:
+                color = "#cc0000"
+                label = "L"
+            elif tile["team2"]:
+                color = "#ff6666"
+                label = "U"
+
+            display_grid[(x, y)] = {"color": color, "label": label}
+
+    return render_template(
+        "grid.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        messages=game_state.messages,
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
