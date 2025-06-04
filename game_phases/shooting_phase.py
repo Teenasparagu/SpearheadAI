@@ -1,11 +1,6 @@
 import random
 import math
-from game_logic.units import apply_damage
 
-
-
-import math
-import random
 
 def is_valid_shooting_target(shooter, target, board, max_range=24):
     for shooter_model in shooter.models:
@@ -126,7 +121,7 @@ def resolve_ranged_attacks(unit, target_unit, board, log):
                         enemy_model = target_unit.models[0] if target_unit.models else None
                         if enemy_model:
                             log(f"  {damage} damage dealt to model at ({enemy_model.x}, {enemy_model.y})")
-                            apply_damage(enemy_model, damage)
+                            target_unit.apply_damage(damage)
                         else:
                             log("  No targets left in unit!")
                     else:

@@ -106,6 +106,20 @@ class Unit:
     def model_count(self):
         return len(self.models)
 
+    def apply_damage(self, dmg):
+        """Apply damage to the first alive model in the unit."""
+        for model in list(self.models):
+            if model.is_alive():
+                model.take_damage(dmg)
+                print(
+                    f"{self.name}: Model took {dmg} damage (HP: {model.current_health}/{model.max_health})"
+                )
+                if not model.is_alive():
+                    print(f"{self.name}: A model has been slain!")
+                    self.models.remove(model)
+                break
+        print(f"{self.name}: {len(self.models)} model(s) remaining.")
+
 
 def is_in_combat(x, y, board, team, radius=6):
     for enemy_unit in board.units:
@@ -114,14 +128,3 @@ def is_in_combat(x, y, board, team, radius=6):
                 if math.sqrt((x - model.x)**2 + (y - model.y)**2) < radius:
                     return True
     return False
-
-def apply_damage(self, dmg):
-        for model in self.models:
-            if model.is_alive():
-                model.take_damage(dmg)
-                print(f"{self.name}: Model took {dmg} damage (HP: {model.current_health}/{model.max_health})")
-                if not model.is_alive():
-                    print(f"{self.name}: A model has been slain!")
-                    self.models.remove(model)
-                break
-        print(f"{self.name}: {len(self.models)} model(s) remaining.")
