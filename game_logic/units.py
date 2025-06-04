@@ -1,14 +1,19 @@
 import importlib
 import math
+from dataclasses import dataclass, field
 
+
+@dataclass
 class Model:
-    def __init__(self, x, y, max_health=1, base_diameter=1.0):
-        self.x = x
-        self.y = y
-        self.max_health = max_health
-        self.current_health = max_health
-        self.base_diameter = base_diameter
-        self.ranged_attacks = []
+    x: int
+    y: int
+    max_health: int = 1
+    base_diameter: float = 1.0
+    ranged_attacks: list = field(default_factory=list)
+    current_health: int = field(init=False)
+
+    def __post_init__(self):
+        self.current_health = self.max_health
 
     def is_alive(self):
         return self.current_health > 0
@@ -37,27 +42,37 @@ class Model:
         return f"Model({self.x}, {self.y}, base={self.base_diameter}\")"
 
 
+@dataclass
 class Unit:
-    def __init__(self, name, faction, team, num_models=5, control_score=None, x=None, y=None, unit_data=None):
-        self.name = name
-        self.faction = faction
-        self.team = team
-        self.num_models = num_models
-        self.has_run = False
+    name: str
+    faction: str
+    team: int
+    num_models: int = 5
+    control_score: int = 1
+    x: int = 3
+    y: int = 3
+    unit_data: dict | None = None
+    move_range: int = 6
+    base_width: float = 1.0
+    base_height: float = 1.0
+    ranged_attacks: list = field(default_factory=list)
+    melee_weapons: list = field(default_factory=list)
+    models: list = field(default_factory=list)
+    has_run: bool = False
 
-        self.x = x if x is not None else 3
-        self.y = y if y is not None else 3
-
+    def __post_init__(self):
+        unit_data = self.unit_data
         if unit_data is None:
-            faction_module = importlib.import_module(f"game_logic.factions.{faction}")
-            unit_data = faction_module.unit_definitions.get(name)
+            faction_module = importlib.import_module(f"game_logic.factions.{self.faction}")
+            unit_data = faction_module.unit_definitions.get(self.name)
             if not unit_data:
-                raise ValueError(f"Unit '{name}' not found in faction '{faction}'")
+                raise ValueError(f"Unit '{self.name}' not found in faction '{self.faction}'")
+            self.unit_data = unit_data
 
-        self.move_range = unit_data.get("move_range", 6)
-        self.control_score = control_score if control_score is not None else unit_data.get("control_score", 1)
-        self.base_width = unit_data.get("base_width", 1.0)
-        self.base_height = unit_data.get("base_height", 1.0)
+        self.move_range = unit_data.get("move_range", self.move_range)
+        self.control_score = unit_data.get("control_score", self.control_score)
+        self.base_width = unit_data.get("base_width", self.base_width)
+        self.base_height = unit_data.get("base_height", self.base_height)
         model_health = unit_data.get("health", 1)
 
         self.ranged_attacks = unit_data.get("range", [])
@@ -103,21 +118,23 @@ class Unit:
             label = "Leader" if i == 0 else f"Model {i}"
             print(f" - {label} at ({model.x}, {model.y}) | Base: {model.base_diameter}\"")
 
-    
-
     def model_count(self):
         return len(self.models)
 
-def apply_damage(self, dmg):
-        for model in self.models:
+    def apply_damage(self, dmg):
+        """Apply damage to the first alive model in the unit."""
+        for model in list(self.models):
             if model.is_alive():
                 model.take_damage(dmg)
-                print(f"{self.name}: Model took {dmg} damage (HP: {model.current_health}/{model.max_health})")
+                print(
+                    f"{self.name}: Model took {dmg} damage (HP: {model.current_health}/{model.max_health})"
+                )
                 if not model.is_alive():
                     print(f"{self.name}: A model has been slain!")
                     self.models.remove(model)
                 break
         print(f"{self.name}: {len(self.models)} model(s) remaining.")
+
 
 def is_in_combat(x, y, board, team, radius=6):
     for enemy_unit in board.units:

@@ -1,11 +1,6 @@
 import random
 import math
-from game_logic.units import apply_damage
 
-
-
-import math
-import random
 
 def is_valid_shooting_target(shooter, target, board, max_range=24):
     for shooter_model in shooter.models:
@@ -36,23 +31,23 @@ def list_targets_for_unit(unit, ai_units, board):
             targets.append(enemy)
     return targets
 
-def player_shooting_phase(board, player_units, ai_units):
-    print("\n--- Shooting Phase (Player) ---")
+def player_shooting_phase(board, player_units, ai_units, get_input, log):
+    log("\n--- Shooting Phase (Player) ---")
     remaining_units = get_player_units_that_can_shoot(player_units, ai_units, board)
 
     while remaining_units:
-        print("\nUnits available to shoot:")
+        log("\nUnits available to shoot:")
         for idx, unit in enumerate(remaining_units):
-            print(f"{idx + 1}. {unit.name} (at {unit.x}, {unit.y})")
+            log(f"{idx + 1}. {unit.name} (at {unit.x}, {unit.y})")
 
         try:
-            choice = int(input("Choose a unit to shoot with (number), or 0 to skip shooting: ")) - 1
+            choice = int(get_input("Choose a unit to shoot with (number), or 0 to skip shooting: ")) - 1
         except ValueError:
-            print("Invalid input.")
+            log("Invalid input.")
             continue
 
         if choice == -1:
-            print("You skipped shooting with the remaining units.")
+            log("You skipped shooting with the remaining units.")
             break
 
         if 0 <= choice < len(remaining_units):
@@ -60,32 +55,32 @@ def player_shooting_phase(board, player_units, ai_units):
             targets = list_targets_for_unit(shooting_unit, ai_units, board)
 
             if not targets:
-                print("No valid targets in range or line of sight.")
+                log("No valid targets in range or line of sight.")
                 remaining_units.remove(shooting_unit)
                 continue
 
-            print("\nAvailable targets:")
+            log("\nAvailable targets:")
             for i, target in enumerate(targets):
-                print(f"{i + 1}. {target.name} at ({target.x}, {target.y})")
+                log(f"{i + 1}. {target.name} at ({target.x}, {target.y})")
 
             try:
-                target_idx = int(input("Choose a target (number): ")) - 1
+                target_idx = int(get_input("Choose a target (number): ")) - 1
             except ValueError:
-                print("Invalid input.")
+                log("Invalid input.")
                 continue
 
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
-                confirm = input(f"Confirm shooting {target.name}? (y/n): ").strip().lower()
+                confirm = get_input(f"Confirm shooting {target.name}? (y/n): ").strip().lower()
                 if confirm == 'y':
-                    resolve_ranged_attacks(shooting_unit, target, board)
+                    resolve_ranged_attacks(shooting_unit, target, board, log)
                     remaining_units.remove(shooting_unit)
                 else:
-                    print("Cancelled. Returning to unit selection.")
+                    log("Cancelled. Returning to unit selection.")
             else:
-                print("Invalid target.")
+                log("Invalid target.")
         else:
-            print("Invalid choice.")
+            log("Invalid choice.")
 
 
 def roll_damage(damage_value):
@@ -102,34 +97,34 @@ def roll_damage(damage_value):
             return random.randint(1, 6) + random.randint(1, 6)
     return 1
 
-def resolve_ranged_attacks(unit, target_unit, board):
+def resolve_ranged_attacks(unit, target_unit, board, log):
     if not hasattr(unit, "ranged_weapons") or not unit.ranged_weapons:
-        print(f"{unit.name} has no ranged weapons!")
+        log(f"{unit.name} has no ranged weapons!")
         return
 
-    print(f"\n{unit.name} is shooting at {target_unit.name}!")
+    log(f"\n{unit.name} is shooting at {target_unit.name}!")
 
     for weapon in unit.ranged_weapons:
-        print(f"Using {weapon['name']}:")
+        log(f"Using {weapon['name']}:")
 
         for model in unit.models:
             for _ in range(weapon["attacks"]):
                 hit = random.randint(1, 6)
-                print(f"  Rolled to hit: {hit} (needs {weapon['to_hit']}+)")
+                log(f"  Rolled to hit: {hit} (needs {weapon['to_hit']}+)")
 
                 if hit >= weapon["to_hit"]:
                     wound = random.randint(1, 6)
-                    print(f"  Rolled to wound: {wound} (needs {weapon['to_wound']}+)")
+                    log(f"  Rolled to wound: {wound} (needs {weapon['to_wound']}+)")
 
                     if wound >= weapon["to_wound"]:
                         damage = weapon["damage"]
                         enemy_model = target_unit.models[0] if target_unit.models else None
                         if enemy_model:
-                            print(f"  {damage} damage dealt to model at ({enemy_model.x}, {enemy_model.y})")
-                            apply_damage(enemy_model, damage)
+                            log(f"  {damage} damage dealt to model at ({enemy_model.x}, {enemy_model.y})")
+                            target_unit.apply_damage(damage)
                         else:
-                            print("  No targets left in unit!")
+                            log("  No targets left in unit!")
                     else:
-                        print("  Failed to wound.")
+                        log("  Failed to wound.")
                 else:
-                    print("  Missed.")
+                    log("  Missed.")

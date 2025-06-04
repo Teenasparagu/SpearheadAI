@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Spearhead AI - Game Grid</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 20px;
+        }
+        table.grid {
+            border-collapse: collapse;
+            margin: auto;
+        }
+        table.grid td {
+            width: 15px;
+            height: 15px;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 10px;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            padding: 0;
+        }
+        .messages {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+        .messages h2 {
+            margin-top: 0;
+        }
+        .tile {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            line-height: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align:center;">Spearhead AI – Game Grid</h1>
+
+    <table class="grid">
+        {% for y in range(height) %}
+        <tr>
+            {% for x in range(width) %}
+            {% set cell = grid[(x, y)] %}
+            <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000'] else 'black' }}">
+                {{ cell.label }}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="messages">
+        <h2>Game Log</h2>
+        <ul>
+            {% for msg in messages %}
+                <li>{{ msg }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+</body>
+</html>

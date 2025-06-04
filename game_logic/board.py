@@ -52,7 +52,6 @@ class Board:
         return True
 
     def place_unit(self, unit: Unit):
-        # 1. Validate entire footprint of every model
         for model in unit.models:
             for x, y in model.get_occupied_squares():
                 if not (0 <= x < self.width and 0 <= y < self.height):
@@ -62,7 +61,6 @@ class Board:
                     print(f"{unit.name} placement failed: tile ({x}, {y}) is already occupied.")
                     return False
 
-        # 2. Check 1" (2-tile) coherency
         for i, model in enumerate(unit.models):
             coherent = False
             for j, other in enumerate(unit.models):
@@ -75,7 +73,6 @@ class Board:
                 print(f"Model at ({model.x}, {model.y}) is not within 1\" of any other model in the unit.")
                 return False
 
-        # 3. If all checks pass, add the unit and mark its footprint
         self.units.append(unit)
         for model in unit.models:
             for x, y in model.get_occupied_squares():
@@ -116,6 +113,14 @@ class Board:
 
         path.append((x2, y2))
         return path
+
+    def is_path_clear(self, start_x, start_y, end_x, end_y):
+        """Check if the straight line between two points is unobstructed."""
+        path = self.get_path(start_x, start_y, end_x, end_y)
+        for x, y in path[1:-1]:  # ignore start and destination tiles
+            if self.grid[y][x] not in (TILE_EMPTY, TILE_OBJECTIVE):
+                return False
+        return True
 
     def is_path_blocked(self, path, start_pos, unit=None):
         for x, y in path:
