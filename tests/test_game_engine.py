@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from game_logic.game_engine import run_deployment_phase, GameEngine
+from game_logic.utils import _simple_deploy_units
 
 
 def _fake_input_generator(responses):
@@ -21,21 +22,6 @@ def _collect_log():
         logs.append(msg)
     return logs, _log
 
-
-def _simple_deploy_units(board, units, territory, zone_name, player_label, get_input, log):
-    for idx, unit in enumerate(units):
-        if player_label.lower() == "player":
-            unit.x = 1
-            unit.y = 1 + idx * 10
-        else:
-            unit.x = board.width - 2
-            unit.y = board.height - 2 - idx * 10
-        for model in unit.models:
-            dx = unit.x - unit.models[0].x
-            dy = unit.y - unit.models[0].y
-            model.x += dx
-            model.y += dy
-        board.place_unit(unit)
 
 
 def setup_deployment(monkeypatch):
