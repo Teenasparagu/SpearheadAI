@@ -30,7 +30,7 @@ def setup_deployment(monkeypatch):
     get_input = _fake_input_generator(["first"])
 
     monkeypatch.setattr("game_logic.game_engine.choose_faction", lambda gi, lg: "stormcast")
-    monkeypatch.setattr("game_logic.game_engine.roll_off", lambda: ("player", "ai"))
+    monkeypatch.setattr("game_logic.game_engine.roll_off", lambda gi, lg: ("player", "ai"))
     monkeypatch.setattr("game_logic.game_engine.choose_battlefield", lambda gi, lg: "aqshy")
     monkeypatch.setattr("game_logic.game_engine.choose_deployment_map", lambda gi, lg: "straight")
     monkeypatch.setattr("game_logic.game_engine.deploy_terrain", lambda *a, **k: None)

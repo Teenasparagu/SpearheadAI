@@ -152,7 +152,7 @@ def run_deployment_phase(game_state, board, get_input, log):
     log(f"AI will play: {ai_faction.title()}")
 
     # Roll-Off
-    attacker, defender = roll_off()
+    attacker, defender = roll_off(get_input, log)
     log(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
 
     # Placeholder enhancement step
