@@ -4,9 +4,9 @@ This project provides a basic game engine with a simple Flask UI.
 
 ## Launching the Flask UI
 
-1. Install dependencies (Flask and pytest are used):
+1. Install dependencies (Flask, numpy, and pytest are used):
    ```bash
-   pip install Flask pytest
+   pip install -r requirements.txt
    ```
 2. Run the application:
    ```bash
