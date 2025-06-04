@@ -378,7 +378,6 @@ def terrain_placement():
                 direction = directions[state["dir_idx"] % len(directions)]
                 rotated = rotate_shape(shape, direction)
                 zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
- codex/implement-terrain-feature-placement
                 enemy_zone_func = attacker_zone if player_zone is defender_zone else defender_zone
                 enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone_func(i, j)]
                 legal, _ = deployment.is_valid_terrain_placement(x, y, rotated, board, zone_coords, enemy_coords)
@@ -393,7 +392,6 @@ def terrain_placement():
                         # AI placement
                         ai_zone = attacker_zone if player_zone is defender_zone else defender_zone
                         ai_zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if ai_zone(i, j)]
- codex/implement-terrain-feature-placement
                         player_zone_list = zone_coords
                         deploy_terrain(
                             board,
@@ -436,7 +434,6 @@ def terrain_placement():
 
     prompt_label = f"Place {pieces[piece_idx][0]} (click to rotate, confirm when done)"
 
- codex/implement-terrain-feature-placement
     zone_color = "#d0e6ff" if player_zone is defender_zone else "#ffd0d0"
     zone_name = "Blue" if player_zone is defender_zone else "Red"
 
@@ -448,7 +445,6 @@ def terrain_placement():
         height=board.height,
         prompt_label=prompt_label,
         messages=game_state.messages,
- codex/implement-terrain-feature-placement
         zone_color=zone_color,
         zone_name=zone_name,
 
