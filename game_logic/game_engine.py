@@ -41,6 +41,80 @@ class GameEngine:
         self.board.update_objective_control()
         # Possibly roll for new priority
 
+    def run_turn(self, team, get_input=input, log=print):
+        """Run all phases for the given team."""
+        self.game_state.current_turn_team = team
+
+        log(f"\n-- {'Player' if team == 'player' else 'AI'} Turn --")
+        log("\n[Start of Round Objective Check]")
+        self.board.update_objective_control()
+        self.board.display_objective_status()
+
+        self.game_state.phase = "movement"
+        if team == 'player':
+            movement_phase.player_movement_phase(self.board, self.game_state.units['player'], get_input, log)
+        else:
+            movement_phase.ai_movement_phase(self.board, self.game_state.units['ai'], get_input, log)
+
+        self.game_state.phase = "shooting"
+        if team == 'player':
+            shooting_phase.player_shooting_phase(self.board, self.game_state.units['player'], self.game_state.units['ai'], get_input, log)
+
+        self.game_state.phase = "charge"
+        if team == 'player':
+            charge_phase.charge_phase(self.board, self.game_state.units['player'], get_input, log)
+        else:
+            charge_phase.ai_charge_phase(self.board, self.game_state.units['ai'], self.game_state.units['player'], get_input, log)
+
+        self.game_state.phase = "combat"
+        current_team_num = 1 if team == 'player' else 2
+        combat_phase.combat_phase(self.board, current_team=current_team_num,
+                                  player_units=self.game_state.units['player'],
+                                  ai_units=self.game_state.units['ai'],
+                                  get_input=get_input, log=log)
+
+        self.game_state.phase = "end"
+        end_units = self.game_state.units['player'] if team == 'player' else self.game_state.units['ai']
+        victory_phase.process_end_phase_actions(self.board, end_units, get_input, log)
+
+        log("\n[End of Round Objective Check]")
+        self.board.update_objective_control()
+        self.board.display_objective_status()
+
+        self.game_state.phase = "victory"
+        scoring_team = 1 if team == 'player' else 2
+        victory_phase.calculate_victory_points(self.board, self.game_state.total_vp, scoring_team, get_input, log)
+
+        # Prepare for next turn
+        self.game_state.phase = "hero"
+
+    def run_round(self, get_input=input, log=print):
+        """Run a full round for both teams."""
+        log(f"\n=== Round {self.game_state.round} Begins ===")
+
+        if self.game_state.round > 1:
+            log("\nRolling off for priority...")
+            player_roll = random.randint(1, 6)
+            ai_roll = random.randint(1, 6)
+            log(f"You rolled a {player_roll}, AI rolled a {ai_roll}")
+
+            if player_roll > ai_roll:
+                choice = get_input("You win the roll-off. Go first or second? (first/second): ").strip().lower()
+                self.game_state.current_priority = 'player' if choice == 'first' else 'ai'
+            elif ai_roll > player_roll:
+                self.game_state.current_priority = random.choice(['player', 'ai'])
+                log(f"AI wins the roll-off and chooses to go {'first' if self.game_state.current_priority == 'ai' else 'second'}.")
+            else:
+                log("It's a tie! Player retains priority.")
+
+        first = self.game_state.current_priority
+        second = 'ai' if first == 'player' else 'player'
+
+        self.run_turn(first, get_input, log)
+        self.run_turn(second, get_input, log)
+
+        self.game_state.round += 1
+
 
 def run_deployment_phase(game_state, board, get_input, log):
 
