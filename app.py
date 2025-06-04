@@ -5,7 +5,13 @@ import random
 import math
 from game_logic.game_engine import GameEngine
 from game_phases import deployment
-from game_phases.deployment import get_deployment_zones
+from game_phases.deployment import (
+    get_deployment_zones,
+    deploy_terrain,
+    is_within_zone,
+    is_clear_of_objectives,
+)
+from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
 from game_phases.movement_phase import player_unit_move, attempt_move
 from game_logic.units import is_in_combat
 from game_logic.utils import _simple_deploy_units
@@ -28,7 +34,7 @@ def _save_game(game: GameEngine) -> None:
     session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
 
 
-def build_display_grid(game_state, board):
+def build_display_grid(game_state, board, preview=None):
     grid_data = game_state.to_grid_dict()
     display_grid = {}
     map_type = game_state.map_layout or "straight"
@@ -72,6 +78,11 @@ def build_display_grid(game_state, board):
                 label = "U"
 
             display_grid[(x, y)] = {"color": color, "label": label}
+
+    if preview:
+        for px, py in preview:
+            if 0 <= px < board.width and 0 <= py < board.height:
+                display_grid[(px, py)] = {"color": "#888888", "label": "T"}
 
     return display_grid
 
@@ -229,6 +240,12 @@ def game_view():
     if "initialized" not in session:
         session["initialized"] = True
         session["inputs"] = {}  # Store user inputs
+        session["terrain_done"] = False
+        session["terrain_state"] = {
+            "piece_index": 0,
+            "pos": None,
+            "dir_idx": 0
+        }
         input_index = 0
         input_sequence.clear()
         factions = deployment.list_factions()
@@ -273,6 +290,10 @@ def game_view():
         apply_partial_deployment(game_state, board, session["inputs"])
         input_index += 1
 
+        if prompt_key == "Enter 1 or 2:" and not session.get("terrain_done"):
+            _save_game(game)
+            return redirect("/terrain")
+
         if input_index >= len(input_sequence):
             inputs = session["inputs"]
             apply_partial_deployment(game_state, board, inputs, final=True)
@@ -282,6 +303,10 @@ def game_view():
     # Step 3: Get next prompt
     if input_index >= len(input_sequence):
         return redirect("/grid")
+
+    if input_sequence[input_index]["prompt"] == "Do you want to go first or second?:" and not session.get("terrain_done"):
+        _save_game(game)
+        return redirect("/terrain")
 
     current = input_sequence[input_index]
     prompt_label = current["label"]
@@ -323,6 +348,87 @@ def display_grid():
         grid=display_grid,
         width=board.width,
         height=board.height,
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/terrain", methods=["GET", "POST"])
+def terrain_placement():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+    state = session.get("terrain_state", {"piece_index": 0, "pos": None, "dir_idx": 0})
+
+    pieces = [
+        ("Rectangle Wall", RECTANGLE_WALL),
+        ("L-Shaped Wall", L_SHAPE_WALL),
+    ]
+    directions = list(rotate_shape.__globals__["DIRECTION_VECTORS"].keys())
+
+    defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
+    player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
+
+    if request.method == "POST":
+        if "confirm" in request.form:
+            if state.get("pos") is not None:
+                x, y = state["pos"]
+                name, shape = pieces[state["piece_index"]]
+                direction = directions[state["dir_idx"] % len(directions)]
+                rotated = rotate_shape(shape, direction)
+                zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+                legal_zone, _ = deployment.is_within_zone(x, y, rotated, zone_coords)
+                clear_obj, _ = deployment.is_clear_of_objectives(x, y, rotated, board.objectives)
+                if legal_zone and clear_obj and board.place_terrain_piece(x, y, rotated):
+                    game_state.log_message(f"Placed {name} at ({x},{y}) facing {direction}")
+                    state["piece_index"] += 1
+                    state["pos"] = None
+                    state["dir_idx"] = 0
+                    if state["piece_index"] >= len(pieces):
+                        session["terrain_done"] = True
+                        # AI placement
+                        ai_zone = attacker_zone if player_zone is defender_zone else defender_zone
+                        ai_zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if ai_zone(i, j)]
+                        deploy_terrain(board, team=2, zone=ai_zone_list, get_input=lambda _: "", log=game_state.log_message)
+                        session["terrain_state"] = state
+                        _save_game(game)
+                        return redirect("/game")
+                else:
+                    game_state.log_message("Invalid placement.")
+        elif "pos" in request.form:
+            x_str, y_str = request.form.get("pos").split(",")
+            x, y = int(x_str), int(y_str)
+            if state.get("pos") == (x, y):
+                state["dir_idx"] = (state["dir_idx"] + 1) % len(directions)
+            else:
+                state["pos"] = (x, y)
+                state["dir_idx"] = 0
+
+    session["terrain_state"] = state
+    piece_idx = state["piece_index"]
+    if piece_idx >= len(pieces):
+        session["terrain_done"] = True
+        _save_game(game)
+        return redirect("/game")
+
+    preview = None
+    if state.get("pos") is not None:
+        x, y = state["pos"]
+        name, shape = pieces[piece_idx]
+        direction = directions[state["dir_idx"] % len(directions)]
+        rotated = rotate_shape(shape, direction)
+        preview = [(x + dx, y + dy) for dx, dy in rotated]
+    display_grid = build_display_grid(game_state, board, preview=preview)
+
+    prompt_label = f"Place {pieces[piece_idx][0]} (click to rotate, confirm when done)"
+
+    response = render_template(
+        "terrain.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label=prompt_label,
         messages=game_state.messages,
     )
     _save_game(game)
