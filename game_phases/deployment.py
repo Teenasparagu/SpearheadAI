@@ -95,25 +95,25 @@ def choose_deployment_map(get_input, log):
 
 def get_deployment_zones(board, map_type):
     if map_type == "straight":
+        mid = board.height // 2
+
         def defender_zone(x, y):
-            return y < (board.height // 2) - 12
+            return y < mid
 
         def attacker_zone(x, y):
-            return y >= (board.height // 2) + 12
+            return y >= mid
 
     elif map_type == "diagonal":
         slope = (15 - 43) / (59 - 20)
-        intercept = 43 - slope * 20
+        intercept = (board.height / 2) - slope * (board.width / 2)
 
         def line_y(x): return slope * x + intercept
 
         def attacker_zone(x, y):
-            return y > line_y(x)
+            return y >= line_y(x)
 
         def defender_zone(x, y):
-            flipped_x = 59 - x
-            flipped_y = 43 - y
-            return attacker_zone(flipped_x, flipped_y)
+            return y < line_y(x)
     else:
         raise ValueError(f"Unknown map type: {map_type}")
 
