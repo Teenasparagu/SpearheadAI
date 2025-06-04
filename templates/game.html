@@ -52,6 +52,12 @@
 </head>
 <body>
 
+    <div style="position:absolute; top:10px; right:10px;">
+        <form method="GET" action="/reset">
+            <button type="submit" style="background-color: darkred; color: white;">Reset Game</button>
+        </form>
+    </div>
+
     <h1>Spearhead AI – Game Board</h1>
 
     <table class="grid">
@@ -78,10 +84,6 @@
                 <input type="text" name="input" required>
                 <button type="submit">Submit</button>
             {% endif %}
-        </form>
-        <br>
-        <form method="GET" action="/reset">
-            <button type="submit" style="background-color: darkred; color: white;">Reset Game</button>
         </form>
     </div>
 
