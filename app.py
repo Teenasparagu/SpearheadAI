@@ -145,6 +145,79 @@ def run_web_deployment_phase(game_state, board, inputs):
     game_state.log_message("Deployment phase complete.")
 
 
+def apply_partial_deployment(game_state, board, inputs, final=False):
+    """Update game state based on partially collected deployment inputs."""
+    factions = deployment.list_factions()
+
+    if "Enter number:" in inputs and not hasattr(game_state, "player_faction"):
+        choice = int(inputs["Enter number:"])
+        game_state.player_faction = factions[max(0, choice - 1)]
+        game_state.ai_faction = [f for f in factions if f != game_state.player_faction][0]
+        game_state.log_message(f"You chose: {game_state.player_faction.title()}")
+        game_state.log_message(f"AI will play: {game_state.ai_faction.title()}")
+
+    if "Choose attacker or defender (a/d):" in inputs and not hasattr(game_state, "attacker"):
+        role = inputs["Choose attacker or defender (a/d):"].strip().lower()
+        attacker = "player" if role == "a" else "ai"
+        defender = "ai" if attacker == "player" else "player"
+        game_state.attacker = attacker
+        game_state.defender = defender
+        game_state.players["attacker"] = attacker
+        game_state.players["defender"] = defender
+        game_state.log_message(f"{attacker.capitalize()} is the attacker, {defender} is the defender.")
+
+    if "(a/g):" in inputs and not board.objectives:
+        realm_choice = inputs["(a/g):"].strip().lower()
+        battlefield = "ghyran" if realm_choice == "g" else "aqshy"
+        game_state.realm = battlefield
+        board.objectives = deployment.get_objectives_for_battlefield(battlefield)
+        game_state.objectives = board.objectives
+        game_state.log_message(f"Objectives placed for {battlefield.title()}:")
+        for obj in board.objectives:
+            game_state.log_message(f" - ({obj.x}, {obj.y})")
+
+    if "Enter 1 or 2:" in inputs and game_state.map_layout is None:
+        map_choice = inputs["Enter 1 or 2:"]
+        deployment_map = "diagonal" if map_choice == "2" else "straight"
+        game_state.map_layout = deployment_map
+        game_state.log_message(f"Deployment map chosen: {deployment_map.title()}")
+
+    if final:
+        attacker = game_state.players.get("attacker")
+        defender = game_state.players.get("defender")
+        player_faction = getattr(game_state, "player_faction", factions[0])
+        ai_faction = getattr(game_state, "ai_faction", factions[1])
+        deployment_map = game_state.map_layout or "straight"
+        zone_name = deployment_map
+        defender_zone, attacker_zone = deployment.get_deployment_zones(board, deployment_map)
+
+        if defender == "player":
+            player_units = deployment.load_faction_force(player_faction, team_number=1)
+            ai_units = deployment.load_faction_force(ai_faction, team_number=2)
+            _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
+            _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+        else:
+            ai_units = deployment.load_faction_force(ai_faction, team_number=1)
+            player_units = deployment.load_faction_force(player_faction, team_number=2)
+            _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
+            _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+
+        game_state.units["player"] = player_units
+        game_state.units["ai"] = ai_units
+
+        if attacker == "player":
+            first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
+            first = "player" if first_choice.startswith("first") else "ai"
+        else:
+            first = "ai"
+            game_state.log_message("AI chooses ai to go first.")
+
+        game_state.phase = "hero"
+        game_state.turn_order = [first, "ai" if first == "player" else "player"]
+        game_state.log_message(f"{first.capitalize()} will take the first turn.")
+        game_state.log_message("Deployment phase complete.")
+
+
 @app.route("/game", methods=["GET", "POST"])
 def game_view():
     global input_index
@@ -158,12 +231,38 @@ def game_view():
         session["inputs"] = {}  # Store user inputs
         input_index = 0
         input_sequence.clear()
+        factions = deployment.list_factions()
         input_sequence.extend([
-            {"prompt": "Enter number:", "type": "faction", "label": "Choose your faction"},
-            {"prompt": "Choose attacker or defender (a/d):", "type": "attacker", "label": "Choose attacker or defender"},
-            {"prompt": "(a/g):", "type": "realm", "label": "Choose a realm (a = Aqshy, g = Ghyran)"},
-            {"prompt": "Enter 1 or 2:", "type": "map", "label": "Choose deployment map (1 = straight, 2 = diagonal)"},
-            {"prompt": "Do you want to go first or second?:", "type": "first_turn", "label": "First turn choice"}
+            {
+                "prompt": "Enter number:",
+                "type": "faction",
+                "label": "Choose your faction",
+                "choices": [{"value": str(i + 1), "label": f.title()} for i, f in enumerate(factions)],
+            },
+            {
+                "prompt": "Choose attacker or defender (a/d):",
+                "type": "attacker",
+                "label": "Choose attacker or defender",
+                "choices": [{"value": "a", "label": "Attacker"}, {"value": "d", "label": "Defender"}],
+            },
+            {
+                "prompt": "(a/g):",
+                "type": "realm",
+                "label": "Choose a realm",
+                "choices": [{"value": "a", "label": "Aqshy"}, {"value": "g", "label": "Ghyran"}],
+            },
+            {
+                "prompt": "Enter 1 or 2:",
+                "type": "map",
+                "label": "Choose deployment map",
+                "choices": [{"value": "1", "label": "Straight"}, {"value": "2", "label": "Diagonal"}],
+            },
+            {
+                "prompt": "Do you want to go first or second?:",
+                "type": "first_turn",
+                "label": "First turn choice",
+                "choices": [{"value": "first", "label": "First"}, {"value": "second", "label": "Second"}],
+            },
         ])
 
     # Step 2: Handle submitted input
@@ -171,21 +270,19 @@ def game_view():
         user_input = request.form.get("input")
         prompt_key = input_sequence[input_index]["prompt"]
         session["inputs"][prompt_key] = user_input
+        apply_partial_deployment(game_state, board, session["inputs"])
         input_index += 1
 
         if input_index >= len(input_sequence):
-            # All inputs received — run deployment
             inputs = session["inputs"]
-
-            # Run a simplified deployment using stored inputs
-            run_web_deployment_phase(game_state, board, inputs)
+            apply_partial_deployment(game_state, board, inputs, final=True)
             _save_game(game)
-
             return redirect("/grid")
 
     # Step 3: Get next prompt
     current = input_sequence[input_index]
     prompt_label = current["label"]
+    choices = current.get("choices")
 
     display_grid = build_display_grid(game_state, board)
 
@@ -195,6 +292,7 @@ def game_view():
         width=board.width,
         height=board.height,
         prompt_label=prompt_label,
+        choices=choices,
         messages=game_state.messages
     )
     _save_game(game)
