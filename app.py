@@ -130,13 +130,13 @@ def run_web_deployment_phase(game_state, board, inputs):
     if defender == "player":
         player_units = deployment.load_faction_force(player_faction, team_number=1)
         ai_units = deployment.load_faction_force(ai_faction, team_number=2)
-        _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
-        _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+        _simple_deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player")
+        _simple_deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI")
     else:
         ai_units = deployment.load_faction_force(ai_faction, team_number=1)
         player_units = deployment.load_faction_force(player_faction, team_number=2)
-        _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
-        _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+        _simple_deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI")
+        _simple_deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player")
 
     game_state.players["attacker"] = attacker
     game_state.players["defender"] = defender
@@ -205,13 +205,13 @@ def apply_partial_deployment(game_state, board, inputs, final=False):
         if defender == "player":
             player_units = deployment.load_faction_force(player_faction, team_number=1)
             ai_units = deployment.load_faction_force(ai_faction, team_number=2)
-            _simple_deploy_units(board, player_units, defender_zone, zone_name, "Player")
-            _simple_deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+            _simple_deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player")
+            _simple_deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI")
         else:
             ai_units = deployment.load_faction_force(ai_faction, team_number=1)
             player_units = deployment.load_faction_force(player_faction, team_number=2)
-            _simple_deploy_units(board, ai_units, defender_zone, zone_name, "AI")
-            _simple_deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+            _simple_deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI")
+            _simple_deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player")
 
         game_state.units["player"] = player_units
         game_state.units["ai"] = ai_units

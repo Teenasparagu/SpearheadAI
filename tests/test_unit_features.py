@@ -1,0 +1,29 @@
+import os, sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from game_logic.board import Board
+from game_logic.units import Unit
+from game_phases.deployment import get_deployment_zones, is_valid_unit_placement
+from game_logic.factions.stormcast import StormcastFactory
+
+
+def test_unit_deployment_respects_enemy_distance():
+    board = Board()
+    defender_zone, attacker_zone = get_deployment_zones(board, "straight")
+    unit_data = StormcastFactory.unit_definitions["Liberators"]
+    unit = Unit("Liberators", "stormcast", team=1, unit_data=unit_data)
+    zone_coords = [(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)]
+    enemy_coords = [(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)]
+    mid = board.height // 2
+    valid, _ = is_valid_unit_placement(board.width // 2, mid - 1, unit, board, zone_coords, enemy_coords)
+    assert not valid
+
+
+def test_move_model_coherency():
+    board = Board()
+    # create simple unit with small bases
+    unit = Unit("Test", "stormcast", team=1, num_models=2, unit_data={"num_models":2,"move_range":6,"base_width":1.0,"base_height":1.0})
+    board.place_unit(unit)
+    assert not board.move_model(unit, 1, unit.models[0].x + 3, unit.models[0].y)
+    assert board.move_model(unit, 1, unit.models[0].x + 2, unit.models[0].y)
+

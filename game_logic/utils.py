@@ -1,5 +1,5 @@
 
-def _simple_deploy_units(board, units, territory, zone_name, player_label, get_input=None, log=lambda *a, **k: None):
+def _simple_deploy_units(board, units, territory, enemy_territory, zone_name, player_label, get_input=None, log=lambda *a, **k: None):
     """Simplified unit placement used for web UI and tests."""
     for idx, unit in enumerate(units):
         if player_label.lower() == "player":
