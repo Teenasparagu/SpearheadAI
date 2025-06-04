@@ -3,37 +3,37 @@ import random
 from game_logic.units import is_in_combat
 
 
-def player_movement_phase(board, player_units):
-    print("\n--- Movement Phase ---")
+def player_movement_phase(board, player_units, get_input, log):
+    log("\n--- Movement Phase ---")
 
     controlled = [obj for obj in board.objectives if obj.control_team]
     if controlled:
         for obj in controlled:
-            print(f"Team {obj.control_team} controls objective at ({obj.x}, {obj.y})")
+            log(f"Team {obj.control_team} controls objective at ({obj.x}, {obj.y})")
     else:
-        print("No objectives currently controlled.")
+        log("No objectives currently controlled.")
 
     for unit in player_units:
-        print(f"\n{unit.name} starts at ({unit.x}, {unit.y})")
+        log(f"\n{unit.name} starts at ({unit.x}, {unit.y})")
 
         if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-            print(f"{unit.name} is in combat.")
-            choice = input("Retreat? (Y/N): ").strip().lower()
+            log(f"{unit.name} is in combat.")
+            choice = get_input("Retreat? (Y/N): ").strip().lower()
             if choice in ["y", "yes"]:
-                retreat_move(unit, board)
+                retreat_move(unit, board, get_input, log)
                 continue
             else:
-                print(f"{unit.name} ends its movement without retreating.")
+                log(f"{unit.name} ends its movement without retreating.")
                 continue
 
 
-        print("Choose movement type: (N = Normal Move, R = Run +D6 inches)")
-        move_type = input(">> ").strip().lower()
+        log("Choose movement type: (N = Normal Move, R = Run +D6 inches)")
+        move_type = get_input(">> ").strip().lower()
 
         if move_type == "r":
-            run_move(unit, board)
+            run_move(unit, board, get_input, log)
         else:
-            normal_move(unit, board)
+            normal_move(unit, board, get_input, log)
 
 direction_map = {
     "n": (0, -1), "nne": (1, -2), "ne": (1, -1), "ene": (2, -1),
@@ -45,13 +45,13 @@ direction_map = {
     "west": (-1, 0), "northwest": (-1, -1)
 }
 
-def move_input_loop(unit, board, move_range):
+def move_input_loop(unit, board, move_range, get_input, log):
     while True:
-        print("Enter direction and distance (e.g., 'ne 5') or type 'skip':")
-        move_input = input(">> ").strip().lower()
+        log("Enter direction and distance (e.g., 'ne 5') or type 'skip':")
+        move_input = get_input(">> ").strip().lower()
 
         if move_input == "skip":
-            print(f"{unit.name} skipped their move.")
+            log(f"{unit.name} skipped their move.")
             break
 
         try:
@@ -59,7 +59,7 @@ def move_input_loop(unit, board, move_range):
             inches = float(inches_str)
 
             if direction_str not in direction_map:
-                print("Invalid direction. Try 'n', 'sw', 'sse', etc.")
+                log("Invalid direction. Try 'n', 'sw', 'sse', etc.")
                 continue
 
             # Convert inches to grid units
@@ -69,7 +69,7 @@ def move_input_loop(unit, board, move_range):
             # Normalize the direction vector
             vector_length = math.sqrt(dx**2 + dy**2)
             if vector_length == 0:
-                print("Invalid direction vector.")
+                log("Invalid direction vector.")
                 continue
 
             dx_normalized = dx / vector_length
@@ -81,58 +81,58 @@ def move_input_loop(unit, board, move_range):
 
             # Check bounds
             if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
-                print("Move out of bounds!")
+                log("Move out of bounds!")
                 continue
 
             # Check if within move range (Euclidean check)
             actual_dist = math.sqrt((dest_x - unit.x)**2 + (dest_y - unit.y)**2)
             if actual_dist > move_range:
-                print(f"{unit.name} can't move that far (max {move_range / 2:.1f} inches).")
+                log(f"{unit.name} can't move that far (max {move_range / 2:.1f} inches).")
                 continue
 
             # Check enemy proximity
             if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-                print("You cannot end your move within 3 inches of an enemy unit (must charge to do so).")
+                log("You cannot end your move within 3 inches of an enemy unit (must charge to do so).")
                 continue
 
             success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 break
             else:
-                print("Invalid move. Try again.")
+                log("Invalid move. Try again.")
         except ValueError:
-            print("Invalid input. Format: 'ne 5' or 'skip'.")
+            log("Invalid input. Format: 'ne 5' or 'skip'.")
 
 
 
 
-def normal_move(unit, board):
+def normal_move(unit, board, get_input, log):
     move_range = unit.move_range  # in squares
     unit.has_run = False
-    print(f"Normal move range: {move_range / 2:.1f} inches")
+    log(f"Normal move range: {move_range / 2:.1f} inches")
 
-    move_input_loop(unit, board, move_range)
+    move_input_loop(unit, board, move_range, get_input, log)
 
-def run_move(unit, board):
+def run_move(unit, board, get_input, log):
     run_bonus = random.randint(1, 6)
     move_range = unit.move_range + run_bonus * 2  # in squares
     unit.has_run = True
-    print(f"Running! Rolled a {run_bonus}. Total range: {move_range / 2:.1f} inches")
+    log(f"Running! Rolled a {run_bonus}. Total range: {move_range / 2:.1f} inches")
 
-    move_input_loop(unit, board, move_range)
+    move_input_loop(unit, board, move_range, get_input, log)
 
-def retreat_move(unit, board):
-    print(f"{unit.name} is retreating.")
+def retreat_move(unit, board, get_input, log):
+    log(f"{unit.name} is retreating.")
     move_range = unit.move_range
     unit.has_run = True  # Retreat disables charge/shoot
 
     while True:
-        print(f"You may retreat up to {move_range / 2:.1f} inches.")
-        print("Enter direction and distance (e.g., 'southwest 5') or type 'skip':")
-        move_input = input(">> ").strip().lower()
+        log(f"You may retreat up to {move_range / 2:.1f} inches.")
+        log("Enter direction and distance (e.g., 'southwest 5') or type 'skip':")
+        move_input = get_input(">> ").strip().lower()
 
         if move_input == "skip":
-            print(f"{unit.name} skipped their retreat.")
+            log(f"{unit.name} skipped their retreat.")
             return
 
         try:
@@ -141,17 +141,17 @@ def retreat_move(unit, board):
             distance_squares = inches * 2
 
             if direction_str not in direction_map:
-                print("Invalid direction. Try 'n', 'sw', 'sse', etc.")
+                log("Invalid direction. Try 'n', 'sw', 'sse', etc.")
                 continue
 
             if distance_squares > move_range:
-                print(f"You cannot retreat more than {move_range / 2:.1f} inches.")
+                log(f"You cannot retreat more than {move_range / 2:.1f} inches.")
                 continue
 
             dx, dy = direction_map[direction_str]
             vector_length = math.sqrt(dx**2 + dy**2)
             if vector_length == 0:
-                print("Invalid direction.")
+                log("Invalid direction.")
                 continue
 
             dx_normalized = dx / vector_length
@@ -162,26 +162,26 @@ def retreat_move(unit, board):
 
 
             if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-                print("Retreat destination is too close to an enemy. Try a different direction.")
+                log("Retreat destination is too close to an enemy. Try a different direction.")
                 continue
 
             success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 # ✅ Apply D3 mortal wounds after retreating
                 dmg = random.randint(1, 3)
-                print(f"{unit.name} suffers {dmg} damage while retreating!")
+                log(f"{unit.name} suffers {dmg} damage while retreating!")
                 unit.apply_damage(dmg)
             return
         except ValueError:
-            print("Invalid input. Use format like 'sw 4.5' or 'skip'.")
+            log("Invalid input. Use format like 'sw 4.5' or 'skip'.")
 
 
                 
-def ai_movement_phase(board, ai_units):
-    print("\nAI's Turn:")
+def ai_movement_phase(board, ai_units, get_input, log):
+    log("\nAI's Turn:")
     for unit in ai_units:
         if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-            print(f"{unit.name} is in combat and cannot move unless retreating.")
+            log(f"{unit.name} is in combat and cannot move unless retreating.")
             continue
 
         # Decide whether to run (50% chance)
@@ -193,7 +193,7 @@ def ai_movement_phase(board, ai_units):
             run_bonus = random.randint(1, 6)
             move_range += run_bonus * 2
             unit.has_run = True
-            print(f"{unit.name} chooses to Run! (Rolled {run_bonus})")
+            log(f"{unit.name} chooses to Run! (Rolled {run_bonus})")
 
         # Try up to 10 directions
         for _ in range(10):
@@ -208,12 +208,12 @@ def ai_movement_phase(board, ai_units):
             if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
                 continue
 
-            print(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
+            log(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
             success = board.move_unit(unit, dest_x, dest_y)
             if success:
                 break  # ✅ move only once per turn
         else:
-            print(f"{unit.name} couldn't find a valid direction to move.")
+            log(f"{unit.name} couldn't find a valid direction to move.")
 
 
         
