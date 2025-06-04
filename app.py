@@ -280,6 +280,9 @@ def game_view():
             return redirect("/grid")
 
     # Step 3: Get next prompt
+    if input_index >= len(input_sequence):
+        return redirect("/grid")
+
     current = input_sequence[input_index]
     prompt_label = current["label"]
     choices = current.get("choices")
