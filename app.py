@@ -50,7 +50,7 @@ def game_view():
                 return inputs.get(prompt, "")
 
             # Run deployment using stored inputs
-            run_deployment_phase(game_state, board, get_input)
+            run_deployment_phase(game_state, board, get_input, game_state.log_message)
 
             return redirect("/grid")
 

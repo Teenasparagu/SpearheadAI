@@ -37,11 +37,11 @@ def pile_in(board, unit, enemies):
                 model.x = new_x
                 model.y = new_y
 
-def resolve_melee_attacks(unit, enemy_units):
-    print(f"{unit.name} makes melee attacks against nearby enemies!")
+def resolve_melee_attacks(unit, enemy_units, log):
+    log(f"{unit.name} makes melee attacks against nearby enemies!")
     # This is where you would add weapon stats and combat resolution later.
 
-def combat_phase(board, current_team, player_units, ai_units):
+def combat_phase(board, current_team, player_units, ai_units, get_input, log):
     all_units = player_units + ai_units
     enemy_map = {1: ai_units, 2: player_units}
     team_map = {1: player_units, 2: ai_units}
@@ -55,7 +55,7 @@ def combat_phase(board, current_team, player_units, ai_units):
     active_team = current_team
     inactive_team = 2 if current_team == 1 else 1
 
-    print("\n>> Combat Phase Begins!")
+    log("\n>> Combat Phase Begins!")
 
     while eligible_units[1] or eligible_units[2]:
         team_units = eligible_units[active_team]
@@ -65,13 +65,13 @@ def combat_phase(board, current_team, player_units, ai_units):
 
         unit = team_units.pop(0)
 
-        print(f"\n{unit.name} (Team {unit.team}) activates!")
+        log(f"\n{unit.name} (Team {unit.team}) activates!")
 
         pile_in(board, unit, enemy_map[unit.team])
-        resolve_melee_attacks(unit, enemy_map[unit.team])
+        resolve_melee_attacks(unit, enemy_map[unit.team], log)
 
         already_fought.add(unit)
 
         active_team, inactive_team = inactive_team, active_team
 
-    print(">> Combat Phase Ends.\n")
+    log(">> Combat Phase Ends.\n")

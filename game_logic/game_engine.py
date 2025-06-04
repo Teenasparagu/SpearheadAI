@@ -42,8 +42,7 @@ class GameEngine:
         # Possibly roll for new priority
 
 
-def run_deployment_phase(game_state, board, get_input):
-    log = game_state.log_message  # short alias
+def run_deployment_phase(game_state, board, get_input, log):
 
     # Faction Selection
     player_faction = choose_faction(get_input, log)
@@ -77,24 +76,32 @@ def run_deployment_phase(game_state, board, get_input):
     defender_team = 1 if defender == "player" else 2
     attacker_team = 1 if attacker == "player" else 2
 
-    deploy_terrain(board, team=defender_team, zone=[
-        (x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)
-    ])
-    deploy_terrain(board, team=attacker_team, zone=[
-        (x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)
-    ])
+    deploy_terrain(
+        board,
+        team=defender_team,
+        zone=[(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)],
+        get_input=get_input,
+        log=log,
+    )
+    deploy_terrain(
+        board,
+        team=attacker_team,
+        zone=[(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)],
+        get_input=get_input,
+        log=log,
+    )
 
     # Units
     if defender == "player":
         player_units = load_faction_force(player_faction, team_number=1)
         ai_units = load_faction_force(ai_faction, team_number=2)
-        deploy_units(board, player_units, defender_zone, zone_name, "Player")
-        deploy_units(board, ai_units, attacker_zone, zone_name, "AI")
+        deploy_units(board, player_units, defender_zone, zone_name, "Player", get_input, log)
+        deploy_units(board, ai_units, attacker_zone, zone_name, "AI", get_input, log)
     else:
         ai_units = load_faction_force(ai_faction, team_number=1)
         player_units = load_faction_force(player_faction, team_number=2)
-        deploy_units(board, ai_units, defender_zone, zone_name, "AI")
-        deploy_units(board, player_units, attacker_zone, zone_name, "Player")
+        deploy_units(board, ai_units, defender_zone, zone_name, "AI", get_input, log)
+        deploy_units(board, player_units, attacker_zone, zone_name, "Player", get_input, log)
 
     game_state.players["attacker"] = attacker
     game_state.players["defender"] = defender

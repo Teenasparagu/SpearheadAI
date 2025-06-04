@@ -1,8 +1,8 @@
-def process_end_phase_actions(board, units):
+def process_end_phase_actions(board, units, get_input, log):
     # Placeholder for future faction-specific abilities
-    print("Processing end phase actions (none for now).")
+    log("Processing end phase actions (none for now).")
 
-def calculate_victory_points(board, total_vp, scoring_team):
+def calculate_victory_points(board, total_vp, scoring_team, get_input, log):
     team1_control = 0
     team2_control = 0
 
@@ -24,4 +24,4 @@ def calculate_victory_points(board, total_vp, scoring_team):
         vp += 1
 
     total_vp[scoring_team] += vp
-    print(f"\nVictory Points scored by Team {scoring_team}: {vp} (Total: {total_vp[scoring_team]})")
+    log(f"\nVictory Points scored by Team {scoring_team}: {vp} (Total: {total_vp[scoring_team]})")
