@@ -181,6 +181,7 @@ def run_deployment_phase(game_state, board, get_input, log):
         board,
         team=defender_team,
         zone=[(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)],
+        enemy_zone=[(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)],
         get_input=get_input,
         log=log,
     )
@@ -188,6 +189,7 @@ def run_deployment_phase(game_state, board, get_input, log):
         board,
         team=attacker_team,
         zone=[(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)],
+        enemy_zone=[(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)],
         get_input=get_input,
         log=log,
     )
