@@ -5,6 +5,7 @@ import math
 from game_logic.units import Unit
 from game_logic.board import Objective
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
+from game_logic.board import TILE_OBJECTIVE
 from game_logic.factions.skaven import SkavenFactory
 from game_logic.factions.stormcast import StormcastFactory
 
@@ -119,7 +120,7 @@ def get_deployment_zones(board, map_type):
 
     return defender_zone, attacker_zone
 
-def deploy_terrain(board, team, zone, get_input, log):
+def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
     zone_name = "Player 1" if team == 1 else "Player 2"
     log(f"{zone_name} Terrain Deployment")
 
@@ -132,10 +133,9 @@ def deploy_terrain(board, team, zone, get_input, log):
                 x, y = random.choice(zone)
                 direction = random.choice(directions)
                 rotated = rotate_shape(base_shape, direction)
-                legal_zone, _ = is_within_zone(x, y, rotated, zone)
-                clear_obj, _ = is_clear_of_objectives(x, y, rotated, board.objectives)
+                legal, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
 
-                if legal_zone and clear_obj:
+                if legal:
                     if board.place_terrain_piece(x, y, rotated):
                         log(f"✅ AI placed {name} at ({x}, {y}) facing {direction}")
                         break
@@ -154,9 +154,8 @@ def deploy_terrain(board, team, zone, get_input, log):
                     x, y = int(parts[0]), int(parts[1])
                     direction = parts[2]
                     rotated = rotate_shape(base_shape, direction)
-                    valid_zone, bad_tile = is_within_zone(x, y, rotated, zone)
-                    valid_obj, obj_tile = is_clear_of_objectives(x, y, rotated, board.objectives)
-                    if valid_zone and valid_obj:
+                    valid, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
+                    if valid:
                         if board.place_terrain_piece(x, y, rotated):
                             log(f"✅ Placed {name} at ({x},{y}) facing {direction}")
                             break
@@ -211,10 +210,29 @@ def is_within_zone(x, y, rotated_shape, zone):
             return False, (x + dx, y + dy)
     return True, None
 
-def is_clear_of_objectives(x, y, rotated_shape, objectives):
+def is_clear_of_objectives(x, y, rotated_shape, board):
     for dx, dy in rotated_shape:
         px, py = x + dx, y + dy
-        for obj in objectives:
-            if math.hypot(px - obj.x, py - obj.y) < 12:  # 6 inches = 12 tiles
+        if board.grid[py][px] == TILE_OBJECTIVE:
+            return False, (px, py)
+    return True, None
+
+
+def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
+    zone_set = set(zone)
+    enemy_set = set(enemy_zone)
+    for dx, dy in rotated_shape:
+        px, py = x + dx, y + dy
+        if (px, py) not in zone_set:
+            return False, (px, py)
+        if not (6 <= px < board.width - 6 and 6 <= py < board.height - 6):
+            return False, (px, py)
+        for ex, ey in enemy_set:
+            if math.hypot(px - ex, py - ey) < 6:
+                return False, (px, py)
+        if board.grid[py][px] == TILE_OBJECTIVE:
+            return False, (px, py)
+        for tx, ty in board.terrain:
+            if math.hypot(px - tx, py - ty) < 12:
                 return False, (px, py)
     return True, None

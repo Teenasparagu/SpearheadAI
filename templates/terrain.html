@@ -9,15 +9,17 @@
         table.grid td { width: 15px; height: 15px; padding: 0; }
         table.grid button { width: 15px; height: 15px; padding: 0; border: 1px solid #ccc; font-size: 10px; font-weight: bold; }
         .messages { max-width: 800px; margin: 20px auto; padding: 10px; background: #fff; border: 1px solid #ccc; font-size: 14px; }
+ codex/implement-terrain-feature-placement
+        .zone-info { text-align: center; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div style="position:absolute; top:10px; right:10px;">
-        <form method="GET" action="/reset">
-            <button type="submit" style="background-color: darkred; color: white;">Reset Game</button>
-        </form>
-    </div>
     <h1 style="text-align:center;">{{ prompt_label }}</h1>
+    <div class="zone-info">
+        Your Deployment Zone:
+        <span style="background-color: {{ zone_color }}; padding: 2px 6px; border: 1px solid #555;">{{ zone_name }}</span>
+    </div>
+
     <form method="POST">
         <table class="grid">
             {% for y in range(height) %}
