@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, session
-from game_logic.board import Board
-from game_logic.game_state import GameState
+import base64
+import pickle
 from game_logic.game_engine import GameEngine
 from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
@@ -9,10 +9,19 @@ import math
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
 
-# Initialize game
-game = GameEngine()
-game_state = game.game_state
-board = game.board
+
+def _load_game() -> GameEngine:
+    """Load the GameEngine instance from the session or create a new one."""
+    if "game_data" not in session:
+        game = GameEngine()
+        session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
+        return game
+    return pickle.loads(base64.b64decode(session["game_data"]))
+
+
+def _save_game(game: GameEngine) -> None:
+    """Persist the GameEngine instance back into the session."""
+    session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
 
 # Shared prompt state
 input_sequence = []
@@ -103,6 +112,9 @@ def run_web_deployment_phase(game_state, board, inputs):
 @app.route("/game", methods=["GET", "POST"])
 def game_view():
     global input_index
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
 
     # Step 1: On first visit, setup the input sequence
     if "initialized" not in session:
@@ -131,6 +143,7 @@ def game_view():
 
             # Run a simplified deployment using stored inputs
             run_web_deployment_phase(game_state, board, inputs)
+            _save_game(game)
 
             return redirect("/grid")
 
@@ -183,7 +196,7 @@ def game_view():
 
             display_grid[(x, y)] = {"color": color, "label": label}
 
-    return render_template(
+    response = render_template(
         "game.html",
         grid=display_grid,
         width=board.width,
@@ -191,17 +204,24 @@ def game_view():
         prompt_label=prompt_label,
         messages=game_state.messages
     )
+    _save_game(game)
+    return response
 
 @app.route("/reset")
 def reset_game():
     session.clear()
-    game.__init__()  # Re-initialize the game engine
+    session.pop("game_data", None)
+    global input_index
+    input_index = 0
     return redirect("/game")
 
 
 @app.route("/grid")
 def display_grid():
     """Display the current game board after setup."""
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
     grid_data = game_state.to_grid_dict()
     display_grid = {}
     map_type = game_state.map_layout or "straight"
@@ -246,13 +266,15 @@ def display_grid():
 
             display_grid[(x, y)] = {"color": color, "label": label}
 
-    return render_template(
+    response = render_template(
         "grid.html",
         grid=display_grid,
         width=board.width,
         height=board.height,
         messages=game_state.messages,
     )
+    _save_game(game)
+    return response
 
 if __name__ == "__main__":
     app.run(debug=True)
