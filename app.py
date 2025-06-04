@@ -1,11 +1,14 @@
 from flask import Flask, render_template, request, redirect, session
 import base64
 import pickle
+import random
+import math
 from game_logic.game_engine import GameEngine
 from game_phases import deployment
 from game_phases.deployment import get_deployment_zones
+from game_phases.movement_phase import player_unit_move, attempt_move
+from game_logic.units import is_in_combat
 from game_logic.utils import _simple_deploy_units
-import math
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
@@ -23,6 +26,54 @@ def _load_game() -> GameEngine:
 def _save_game(game: GameEngine) -> None:
     """Persist the GameEngine instance back into the session."""
     session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
+
+
+def build_display_grid(game_state, board):
+    grid_data = game_state.to_grid_dict()
+    display_grid = {}
+    map_type = game_state.map_layout or "straight"
+    defender_zone, attacker_zone = get_deployment_zones(board, map_type)
+
+    for y in range(board.height):
+        for x in range(board.width):
+            tile = grid_data[(x, y)]
+            color = "white"
+            label = ""
+
+            if defender_zone(x, y):
+                color = "#d0e6ff"
+            if attacker_zone(x, y):
+                color = "#ffd0d0"
+            for obj in board.objectives:
+                if math.hypot(x - obj.x, y - obj.y) <= 6:
+                    if obj.control_team == 1:
+                        color = "#a0c4ff"
+                        label = "O"
+                    elif obj.control_team == 2:
+                        color = "#ffb3b3"
+                        label = "O"
+                    else:
+                        color = "#d9d9d9"
+                        label = "O"
+            if tile["terrain"]:
+                color = "black"
+                label = "T"
+            if tile["leader1"]:
+                color = "#0044cc"
+                label = "L"
+            elif tile["team1"]:
+                color = "#3399ff"
+                label = "U"
+            elif tile["leader2"]:
+                color = "#cc0000"
+                label = "L"
+            elif tile["team2"]:
+                color = "#ff6666"
+                label = "U"
+
+            display_grid[(x, y)] = {"color": color, "label": label}
+
+    return display_grid
 
 # Shared prompt state
 input_sequence = []
@@ -136,50 +187,7 @@ def game_view():
     current = input_sequence[input_index]
     prompt_label = current["label"]
 
-    # Build visual grid with priorities
-    grid_data = game_state.to_grid_dict()
-    display_grid = {}
-    map_type = game_state.map_layout or "straight"
-    defender_zone, attacker_zone = get_deployment_zones(board, map_type)
-
-    for y in range(board.height):
-        for x in range(board.width):
-            tile = grid_data[(x, y)]
-            color = "white"
-            label = ""
-
-            if defender_zone(x, y):
-                color = "#d0e6ff"
-            if attacker_zone(x, y):
-                color = "#ffd0d0"
-            for obj in board.objectives:
-                if math.hypot(x - obj.x, y - obj.y) <= 6:
-                    if obj.control_team == 1:
-                        color = "#a0c4ff"
-                        label = "O"
-                    elif obj.control_team == 2:
-                        color = "#ffb3b3"
-                        label = "O"
-                    else:
-                        color = "#d9d9d9"
-                        label = "O"
-            if tile["terrain"]:
-                color = "black"
-                label = "T"
-            if tile["leader1"]:
-                color = "#0044cc"
-                label = "L"
-            elif tile["team1"]:
-                color = "#3399ff"
-                label = "U"
-            elif tile["leader2"]:
-                color = "#cc0000"
-                label = "L"
-            elif tile["team2"]:
-                color = "#ff6666"
-                label = "U"
-
-            display_grid[(x, y)] = {"color": color, "label": label}
+    display_grid = build_display_grid(game_state, board)
 
     response = render_template(
         "game.html",
@@ -207,55 +215,120 @@ def display_grid():
     game = _load_game()
     game_state = game.game_state
     board = game.board
-    grid_data = game_state.to_grid_dict()
-    display_grid = {}
-    map_type = game_state.map_layout or "straight"
-    defender_zone, attacker_zone = get_deployment_zones(board, map_type)
-
-    for y in range(board.height):
-        for x in range(board.width):
-            tile = grid_data[(x, y)]
-            color = "white"
-            label = ""
-
-            if defender_zone(x, y):
-                color = "#d0e6ff"
-            if attacker_zone(x, y):
-                color = "#ffd0d0"
-            for obj in board.objectives:
-                if math.hypot(x - obj.x, y - obj.y) <= 6:
-                    if obj.control_team == 1:
-                        color = "#a0c4ff"
-                        label = "O"
-                    elif obj.control_team == 2:
-                        color = "#ffb3b3"
-                        label = "O"
-                    else:
-                        color = "#d9d9d9"
-                        label = "O"
-            if tile["terrain"]:
-                color = "black"
-                label = "T"
-            if tile["leader1"]:
-                color = "#0044cc"
-                label = "L"
-            elif tile["team1"]:
-                color = "#3399ff"
-                label = "U"
-            elif tile["leader2"]:
-                color = "#cc0000"
-                label = "L"
-            elif tile["team2"]:
-                color = "#ff6666"
-                label = "U"
-
-            display_grid[(x, y)] = {"color": color, "label": label}
+    display_grid = build_display_grid(game_state, board)
 
     response = render_template(
         "grid.html",
         grid=display_grid,
         width=board.width,
         height=board.height,
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/move", methods=["GET", "POST"])
+def move_unit_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+    state = session.get("move_state", {"step": "select"})
+    player_units = game_state.units.get("player", [])
+
+    if request.method == "POST":
+        user_input = request.form.get("input", "").strip().lower()
+        step = state.get("step")
+
+        if step == "select":
+            try:
+                idx = int(user_input) - 1
+                if 0 <= idx < len(player_units):
+                    state["unit_idx"] = idx
+                    unit = player_units[idx]
+                    if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
+                        game_state.log_message(f"{unit.name} is in combat.")
+                        state["step"] = "retreat_choice"
+                    else:
+                        state["step"] = "move_choice"
+                else:
+                    game_state.log_message("Invalid unit selection.")
+            except ValueError:
+                game_state.log_message("Invalid input.")
+
+        elif step == "retreat_choice":
+            unit = player_units[state["unit_idx"]]
+            if user_input.startswith("y"):
+                state["step"] = "retreat_dir"
+            else:
+                game_state.log_message(f"{unit.name} ends its movement without retreating.")
+                session.pop("move_state", None)
+                _save_game(game)
+                return redirect("/grid")
+
+        elif step == "retreat_dir":
+            unit = player_units[state["unit_idx"]]
+            if user_input == "skip":
+                game_state.log_message(f"{unit.name} skipped their retreat.")
+                session.pop("move_state", None)
+            else:
+                if attempt_move(unit, board, user_input, unit.move_range, game_state.log_message):
+                    dmg = random.randint(1, 3)
+                    game_state.log_message(f"{unit.name} suffers {dmg} damage while retreating!")
+                    unit.apply_damage(dmg)
+                    session.pop("move_state", None)
+                else:
+                    game_state.log_message("Invalid move.")
+
+        elif step == "move_choice":
+            unit = player_units[state["unit_idx"]]
+            if user_input.startswith("n"):
+                game_state.log_message(f"{unit.name} does not move.")
+                session.pop("move_state", None)
+            elif user_input.startswith("r"):
+                run_bonus = random.randint(1, 6)
+                state["move_range"] = unit.move_range + run_bonus * 2
+                unit.has_run = True
+                game_state.log_message(f"{unit.name} runs! Rolled {run_bonus}.")
+                state["step"] = "direction"
+            elif user_input.startswith("m"):
+                state["move_range"] = unit.move_range
+                unit.has_run = False
+                state["step"] = "direction"
+            else:
+                game_state.log_message("Invalid option.")
+
+        elif step == "direction":
+            unit = player_units[state["unit_idx"]]
+            if user_input == "skip":
+                game_state.log_message(f"{unit.name} skipped their move.")
+                session.pop("move_state", None)
+            else:
+                if attempt_move(unit, board, user_input, state.get("move_range", unit.move_range), game_state.log_message):
+                    session.pop("move_state", None)
+                else:
+                    game_state.log_message("Invalid move.")
+
+    step = session.get("move_state", state).get("step")
+    if step == "select":
+        prompt_label = "Select a unit to move (number)"
+    elif step == "retreat_choice":
+        prompt_label = "Retreat? (y/n)"
+    elif step == "retreat_dir":
+        prompt_label = "Enter retreat direction and distance or 'skip'"
+    elif step == "move_choice":
+        prompt_label = "Choose movement - N = No Move, M = Move, R = Run"
+    else:  # direction
+        prompt_label = "Enter direction and distance or 'skip'"
+
+    session["move_state"] = state
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label=prompt_label,
         messages=game_state.messages,
     )
     _save_game(game)
