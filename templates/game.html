@@ -70,8 +70,14 @@
     <div class="input-form">
         <form method="POST">
             <label><strong>{{ prompt_label }}</strong></label><br><br>
-            <input type="text" name="input" required>
-            <button type="submit">Submit</button>
+            {% if choices %}
+                {% for c in choices %}
+                    <button type="submit" name="input" value="{{ c.value }}">{{ c.label }}</button>
+                {% endfor %}
+            {% else %}
+                <input type="text" name="input" required>
+                <button type="submit">Submit</button>
+            {% endif %}
         </form>
         <br>
         <form method="GET" action="/reset">
