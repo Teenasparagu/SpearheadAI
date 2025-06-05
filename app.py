@@ -15,7 +15,7 @@ from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
 from game_phases.movement_phase import move_unit_to
 from game_phases import shooting_phase, charge_phase, combat_phase, victory_phase
 from game_logic.units import is_in_combat, Model
-from game_logic.utils import _simple_deploy_units, _triangle_offsets
+from game_logic.utils import _simple_deploy_units
 
 
 def _triangle_offsets(num, orientation):
@@ -23,7 +23,7 @@ def _triangle_offsets(num, orientation):
     offsets = [(0, 0)]
     placed = 1
     row = 2
-    y = -orientation * 2
+    y = -orientation
     while placed < num:
         start_x = -(row - 1)
         for i in range(row):
@@ -32,7 +32,7 @@ def _triangle_offsets(num, orientation):
             offsets.append((start_x + 2 * i, y))
             placed += 1
         row += 1
-        y -= orientation * 2
+        y -= orientation
     return offsets
 
 app = Flask(__name__)
