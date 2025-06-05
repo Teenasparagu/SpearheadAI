@@ -12,7 +12,8 @@ from game_phases.deployment import (
     is_clear_of_objectives,
 )
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
-from game_phases.movement_phase import player_unit_move, attempt_move
+from game_phases.movement_phase import move_unit_to
+from game_phases import shooting_phase, charge_phase, combat_phase, victory_phase
 from game_logic.units import is_in_combat
 from game_logic.utils import _simple_deploy_units
 
@@ -298,11 +299,11 @@ def game_view():
             inputs = session["inputs"]
             apply_partial_deployment(game_state, board, inputs, final=True)
             _save_game(game)
-            return redirect("/grid")
+            return redirect("/hero")
 
     # Step 3: Get next prompt
     if input_index >= len(input_sequence):
-        return redirect("/grid")
+        return redirect("/hero")
 
     if input_sequence[input_index]["prompt"] == "Do you want to go first or second?:" and not session.get("terrain_done"):
         _save_game(game)
@@ -348,6 +349,31 @@ def display_grid():
         grid=display_grid,
         width=board.width,
         height=board.height,
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/hero", methods=["GET", "POST"])
+def hero_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        game_state.phase = "movement"
+        _save_game(game)
+        return redirect("/move")
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label="Hero Phase",
+        choices=[{"value": "next", "label": "Next Phase"}],
         messages=game_state.messages,
     )
     _save_game(game)
@@ -462,98 +488,243 @@ def move_unit_view():
     player_units = game_state.units.get("player", [])
 
     if request.method == "POST":
-        user_input = request.form.get("input", "").strip().lower()
+        if "finish" in request.form:
+            session.pop("move_state", None)
+            game_state.phase = "shooting"
+            _save_game(game)
+            return redirect("/shoot")
+
         step = state.get("step")
-
-        if step == "select":
-            try:
-                idx = int(user_input) - 1
-                if 0 <= idx < len(player_units):
+        if step == "select" and "pos" in request.form:
+            x_str, y_str = request.form.get("pos").split(",")
+            x, y = int(x_str), int(y_str)
+            for idx, u in enumerate(player_units):
+                if any(m.x == x and m.y == y for m in u.models):
                     state["unit_idx"] = idx
-                    unit = player_units[idx]
+                    unit = u
                     if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-                        game_state.log_message(f"{unit.name} is in combat.")
-                        state["step"] = "retreat_choice"
+                        state["step"] = "combat_choice"
                     else:
-                        state["step"] = "move_choice"
-                else:
-                    game_state.log_message("Invalid unit selection.")
-            except ValueError:
-                game_state.log_message("Invalid input.")
-
-        elif step == "retreat_choice":
-            unit = player_units[state["unit_idx"]]
-            if user_input.startswith("y"):
-                state["step"] = "retreat_dir"
+                        state["step"] = "move_type"
+                    break
             else:
-                game_state.log_message(f"{unit.name} ends its movement without retreating.")
-                session.pop("move_state", None)
-                _save_game(game)
-                return redirect("/grid")
+                game_state.log_message("No unit at that position.")
 
-        elif step == "retreat_dir":
+        elif step == "combat_choice" and "action" in request.form:
             unit = player_units[state["unit_idx"]]
-            if user_input == "skip":
-                game_state.log_message(f"{unit.name} skipped their retreat.")
-                session.pop("move_state", None)
-            else:
-                if attempt_move(unit, board, user_input, unit.move_range, game_state.log_message):
-                    dmg = random.randint(1, 3)
-                    game_state.log_message(f"{unit.name} suffers {dmg} damage while retreating!")
-                    unit.apply_damage(dmg)
-                    session.pop("move_state", None)
-                else:
-                    game_state.log_message("Invalid move.")
+            if request.form["action"] == "stay":
+                game_state.log_message(f"{unit.name} stays in combat.")
+                state = {"step": "select"}
+            else:  # retreat
+                state["move_range"] = unit.move_range
+                unit.has_run = True
+                state["step"] = "dest"
 
-        elif step == "move_choice":
+        elif step == "move_type" and "action" in request.form:
             unit = player_units[state["unit_idx"]]
-            if user_input.startswith("n"):
-                game_state.log_message(f"{unit.name} does not move.")
-                session.pop("move_state", None)
-            elif user_input.startswith("r"):
+            if request.form["action"] == "normal":
+                state["move_range"] = unit.move_range
+                unit.has_run = False
+                state["step"] = "dest"
+            elif request.form["action"] == "run":
                 run_bonus = random.randint(1, 6)
                 state["move_range"] = unit.move_range + run_bonus * 2
                 unit.has_run = True
                 game_state.log_message(f"{unit.name} runs! Rolled {run_bonus}.")
-                state["step"] = "direction"
-            elif user_input.startswith("m"):
-                state["move_range"] = unit.move_range
-                unit.has_run = False
-                state["step"] = "direction"
-            else:
-                game_state.log_message("Invalid option.")
+                state["step"] = "dest"
 
-        elif step == "direction":
+        elif step == "dest" and "pos" in request.form:
             unit = player_units[state["unit_idx"]]
-            if user_input == "skip":
-                game_state.log_message(f"{unit.name} skipped their move.")
-                session.pop("move_state", None)
+            x_str, y_str = request.form.get("pos").split(",")
+            x, y = int(x_str), int(y_str)
+            moved = move_unit_to(unit, board, x, y, state.get("move_range", unit.move_range), game_state.log_message)
+            if moved:
+                state = {"step": "select"}
             else:
-                if attempt_move(unit, board, user_input, state.get("move_range", unit.move_range), game_state.log_message):
-                    session.pop("move_state", None)
-                else:
-                    game_state.log_message("Invalid move.")
+                game_state.log_message("Invalid destination.")
 
-    step = session.get("move_state", state).get("step")
-    if step == "select":
-        prompt_label = "Select a unit to move (number)"
-    elif step == "retreat_choice":
-        prompt_label = "Retreat? (y/n)"
-    elif step == "retreat_dir":
-        prompt_label = "Enter retreat direction and distance or 'skip'"
-    elif step == "move_choice":
-        prompt_label = "Choose movement - N = No Move, M = Move, R = Run"
-    else:  # direction
-        prompt_label = "Enter direction and distance or 'skip'"
+        elif "cancel" in request.form:
+            state = {"step": "select"}
 
     session["move_state"] = state
+    step = state.get("step")
+    if step == "select":
+        prompt_label = "Select a unit (click on the grid) or Finish"
+    elif step == "combat_choice":
+        prompt_label = "Unit in combat: Stay or Retreat?"
+    elif step == "move_type":
+        prompt_label = "Choose Move or Run"
+    else:  # dest
+        prompt_label = "Select destination"
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "movement.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label=prompt_label,
+        step=step,
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/shoot", methods=["GET", "POST"])
+def shooting_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        shooting_phase.player_shooting_phase(
+            board,
+            game_state.units.get("player", []),
+            game_state.units.get("ai", []),
+            lambda _: "0",
+            game_state.log_message,
+        )
+        game_state.phase = "charge"
+        _save_game(game)
+        return redirect("/charge")
+
     display_grid = build_display_grid(game_state, board)
     response = render_template(
         "game.html",
         grid=display_grid,
         width=board.width,
         height=board.height,
-        prompt_label=prompt_label,
+        prompt_label="Shooting Phase",
+        choices=[{"value": "next", "label": "Resolve"}],
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/charge", methods=["GET", "POST"])
+def charge_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        charge_phase.charge_phase(
+            board,
+            game_state.units.get("player", []),
+            lambda _: "n",
+            game_state.log_message,
+        )
+        game_state.phase = "combat"
+        _save_game(game)
+        return redirect("/combat")
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label="Charge Phase",
+        choices=[{"value": "next", "label": "Resolve"}],
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/combat", methods=["GET", "POST"])
+def combat_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        combat_phase.combat_phase(
+            board,
+            current_team=1,
+            player_units=game_state.units.get("player", []),
+            ai_units=game_state.units.get("ai", []),
+            get_input=lambda _: "",
+            log=game_state.log_message,
+        )
+        game_state.phase = "end"
+        _save_game(game)
+        return redirect("/end")
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label="Combat Phase",
+        choices=[{"value": "next", "label": "Resolve"}],
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/end", methods=["GET", "POST"])
+def end_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        victory_phase.process_end_phase_actions(
+            board,
+            game_state.units.get("player", []),
+            lambda _: "",
+            game_state.log_message,
+        )
+        game_state.phase = "victory"
+        _save_game(game)
+        return redirect("/victory")
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label="End Phase",
+        choices=[{"value": "next", "label": "Resolve"}],
+        messages=game_state.messages,
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/victory", methods=["GET", "POST"])
+def victory_phase_view():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+
+    if request.method == "POST":
+        board.update_objective_control()
+        victory_phase.calculate_victory_points(
+            board,
+            game_state.total_vp,
+            1,
+            lambda _: "",
+            game_state.log_message,
+        )
+        game_state.phase = "hero"
+        _save_game(game)
+        return redirect("/hero")
+
+    display_grid = build_display_grid(game_state, board)
+    response = render_template(
+        "game.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label="Victory Phase",
+        choices=[{"value": "next", "label": "Resolve"}],
         messages=game_state.messages,
     )
     _save_game(game)
