@@ -1,4 +1,4 @@
- web_interface
+web_interface
 from game_logic.game_engine import GameEngine
 
 
