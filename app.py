@@ -14,7 +14,7 @@ from game_phases.deployment import (
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
 from game_phases.movement_phase import move_unit_to
 from game_phases import shooting_phase, charge_phase, combat_phase, victory_phase
-from game_logic.units import is_in_combat
+from game_logic.units import is_in_combat, Model
 from game_logic.utils import _simple_deploy_units, _triangle_offsets
 
 
