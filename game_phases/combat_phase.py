@@ -64,7 +64,7 @@ def combat_phase(board, current_team, player_units, ai_units, get_input, log):
         pile_in(board, unit, enemy_map[unit.team])
         resolve_melee_attacks(unit, enemy_map[unit.team], log)
 
-        already_fought.add(unit)
+        already_fought.add(id(unit))
 
         active_team, inactive_team = inactive_team, active_team
 

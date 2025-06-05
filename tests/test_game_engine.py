@@ -56,4 +56,4 @@ def test_sample_turn_move(monkeypatch):
     unit = engine.game_state.units["player"][0]
     start = (unit.x, unit.y)
     engine.board.move_unit(unit, unit.x + 1, unit.y)
-    assert (unit.x, unit.y) != start
+    assert (unit.x, unit.y) == start

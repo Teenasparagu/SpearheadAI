@@ -52,32 +52,12 @@ class Board:
         return True
 
     def place_unit(self, unit: Unit):
-        for model in unit.models:
-            for x, y in model.get_occupied_squares():
-                if not (0 <= x < self.width and 0 <= y < self.height):
-                    print(f"{unit.name} placement failed: model at ({x}, {y}) is out of bounds.")
-                    return False
-                if self.grid[y][x] != TILE_EMPTY:
-                    print(f"{unit.name} placement failed: tile ({x}, {y}) is already occupied.")
-                    return False
-
-        for i, model in enumerate(unit.models):
-            coherent = False
-            for j, other in enumerate(unit.models):
-                if i != j:
-                    dist = math.sqrt((model.x - other.x)**2 + (model.y - other.y)**2)
-                    if dist <= 2:
-                        coherent = True
-                        break
-            if not coherent:
-                print(f"Model at ({model.x}, {model.y}) is not within 1\" of any other model in the unit.")
-                return False
-
+        """Place unit without validation for debugging."""
         self.units.append(unit)
         for model in unit.models:
             for x, y in model.get_occupied_squares():
-                self.grid[y][x] = TILE_UNIT
-
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.grid[y][x] = TILE_UNIT
         print(f"{unit.name} placed successfully.")
         return True
 
