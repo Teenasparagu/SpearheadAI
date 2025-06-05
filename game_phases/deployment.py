@@ -324,15 +324,10 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
     """Check leader tile only before generating a formation."""
     if (x, y) not in set(zone):
         return False, "Outside deployment zone"
-    # Allow placement closer to the board edge than units, but still keep a
-    # minimal buffer so models don't start hanging off the map. Six squares
-    # gives players room to position leaders while leaving space for formations.
-    if x < 6 or y < 6 or x >= board.width - 6 or y >= board.height - 6:
-        return False, "Too close to board edge"
     if board.grid[y][x] != "-":
         return False, "Tile occupied"
     for ex, ey in enemy_zone:
-        if math.hypot(x - ex, y - ey) < 12:
+        if math.hypot(x - ex, y - ey) < 6:
             return False, "Too close to enemy zone"
     for tx, ty in board.terrain:
         if math.hypot(x - tx, y - ty) < 12:
@@ -346,8 +341,6 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     for dx, dy in rotated_shape:
         px, py = x + dx, y + dy
         if (px, py) not in zone_set:
-            return False, (px, py)
-        if not (6 <= px < board.width - 6 and 6 <= py < board.height - 6):
             return False, (px, py)
         for ex, ey in enemy_set:
             if math.hypot(px - ex, py - ey) < 6:
@@ -378,16 +371,12 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
         for px, py in squares:
             if not (0 <= px < board.width and 0 <= py < board.height):
                 return False, "Out of bounds"
-            # Models need a little breathing room from the table edge but can be
-            # closer than the earlier 12 square requirement.
-            if px < 6 or py < 6 or px >= board.width - 6 or py >= board.height - 6:
-                return False, "Too close to board edge"
             if board.grid[py][px] != "-":
                 return False, "Tile occupied"
             if (px, py) not in zone_set:
                 return False, "Outside deployment zone"
             for ex, ey in enemy_set:
-                if math.hypot(px - ex, py - ey) < 12:
+                if math.hypot(px - ex, py - ey) < 6:
                     return False, "Too close to enemy zone"
 
     for i, (mx, my, _) in enumerate(new_positions):
