@@ -327,11 +327,8 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
     if board.grid[y][x] != "-":
         return False, "Tile occupied"
     for ex, ey in enemy_zone:
-        if math.hypot(x - ex, y - ey) < 6:
+        if math.hypot(x - ex, y - ey) < 12:
             return False, "Too close to enemy zone"
-    for tx, ty in board.terrain:
-        if math.hypot(x - tx, y - ty) < 12:
-            return False, "Too close to terrain"
     return True, None
 
 
@@ -376,7 +373,7 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
             if (px, py) not in zone_set:
                 return False, "Outside deployment zone"
             for ex, ey in enemy_set:
-                if math.hypot(px - ex, py - ey) < 6:
+                if math.hypot(px - ex, py - ey) < 12:
                     return False, "Too close to enemy zone"
 
     for i, (mx, my, _) in enumerate(new_positions):
