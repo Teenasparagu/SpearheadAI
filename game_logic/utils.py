@@ -15,3 +15,12 @@ def _simple_deploy_units(board, units, territory, enemy_territory, zone_name, pl
             model.y += dy
         board.place_unit(unit)
 
+
+def _triangle_offsets(size: int = 3):
+    """Return coordinate offsets forming a right triangle of the given size."""
+    offsets = []
+    for y in range(size):
+        for x in range(y + 1):
+            offsets.append((x, y))
+    return offsets
+
