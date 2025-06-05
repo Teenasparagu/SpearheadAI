@@ -12,10 +12,26 @@ from game_phases.deployment import (
     is_clear_of_objectives,
 )
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
-from game_phases.movement_phase import move_unit_to
-from game_phases import shooting_phase, charge_phase, combat_phase, victory_phase
-from game_logic.units import is_in_combat
+from game_phases.movement_phase import player_unit_move, attempt_move
+from game_logic.units import is_in_combat, Model
 from game_logic.utils import _simple_deploy_units
+
+def _triangle_offsets(num, orientation):
+    """Return offsets for models in a triangle behind the leader."""
+    offsets = [(0, 0)]
+    placed = 1
+    row = 2
+    y = -orientation * 2
+    while placed < num:
+        start_x = -(row - 1)
+        for i in range(row):
+            if placed >= num:
+                break
+            offsets.append((start_x + 2 * i, y))
+            placed += 1
+        row += 1
+        y -= orientation * 2
+    return offsets
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
@@ -203,19 +219,19 @@ def apply_partial_deployment(game_state, board, inputs, final=False):
         zone_name = deployment_map
         defender_zone, attacker_zone = deployment.get_deployment_zones(board, deployment_map)
 
-        if defender == "player":
-            player_units = deployment.load_faction_force(player_faction, team_number=1)
-            ai_units = deployment.load_faction_force(ai_faction, team_number=2)
-            _simple_deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player")
-            _simple_deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI")
-        else:
-            ai_units = deployment.load_faction_force(ai_faction, team_number=1)
-            player_units = deployment.load_faction_force(player_faction, team_number=2)
-            _simple_deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI")
-            _simple_deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player")
-
-        game_state.units["player"] = player_units
-        game_state.units["ai"] = ai_units
+        if not game_state.units["player"] and not game_state.units["ai"]:
+            if defender == "player":
+                player_units = deployment.load_faction_force(player_faction, team_number=1)
+                ai_units = deployment.load_faction_force(ai_faction, team_number=2)
+                _simple_deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player")
+                _simple_deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI")
+            else:
+                ai_units = deployment.load_faction_force(ai_faction, team_number=1)
+                player_units = deployment.load_faction_force(player_faction, team_number=2)
+                _simple_deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI")
+                _simple_deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player")
+            game_state.units["player"] = player_units
+            game_state.units["ai"] = ai_units
 
         if attacker == "player":
             first_choice = inputs.get("Do you want to go first or second?:", "first").strip().lower()
@@ -242,11 +258,13 @@ def game_view():
         session["initialized"] = True
         session["inputs"] = {}  # Store user inputs
         session["terrain_done"] = False
+        session["unit_done"] = False
         session["terrain_state"] = {
             "piece_index": 0,
             "pos": None,
             "dir_idx": 0
         }
+        session["unit_state"] = {"unit_idx": 0, "pos": None, "manual": False, "model_positions": []}
         input_index = 0
         input_sequence.clear()
         factions = deployment.list_factions()
@@ -294,6 +312,9 @@ def game_view():
         if prompt_key == "Enter 1 or 2:" and not session.get("terrain_done"):
             _save_game(game)
             return redirect("/terrain")
+        if prompt_key == "Do you want to go first or second?:" and not session.get("unit_done"):
+            _save_game(game)
+            return redirect("/units")
 
         if input_index >= len(input_sequence):
             inputs = session["inputs"]
@@ -308,6 +329,9 @@ def game_view():
     if input_sequence[input_index]["prompt"] == "Do you want to go first or second?:" and not session.get("terrain_done"):
         _save_game(game)
         return redirect("/terrain")
+    if input_sequence[input_index]["prompt"] == "Do you want to go first or second?:" and not session.get("unit_done"):
+        _save_game(game)
+        return redirect("/units")
 
     current = input_sequence[input_index]
     prompt_label = current["label"]
@@ -474,6 +498,123 @@ def terrain_placement():
         zone_color=zone_color,
         zone_name=zone_name,
 
+    )
+    _save_game(game)
+    return response
+
+
+@app.route("/units", methods=["GET", "POST"])
+def unit_placement():
+    game = _load_game()
+    game_state = game.game_state
+    board = game.board
+    state = session.get("unit_state", {"unit_idx": 0, "pos": None, "manual": False, "model_positions": []})
+
+    defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
+    player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
+    enemy_zone = attacker_zone if player_zone is defender_zone else defender_zone
+
+    if not game_state.units["player"]:
+        player_faction = getattr(game_state, "player_faction", deployment.list_factions()[0])
+        ai_faction = getattr(game_state, "ai_faction", deployment.list_factions()[1])
+        if game_state.players.get("defender") == "player":
+            player_units = deployment.load_faction_force(player_faction, team_number=1)
+            ai_units = deployment.load_faction_force(ai_faction, team_number=2)
+        else:
+            ai_units = deployment.load_faction_force(ai_faction, team_number=1)
+            player_units = deployment.load_faction_force(player_faction, team_number=2)
+        game_state.units["player"] = player_units
+        game_state.units["ai"] = ai_units
+
+    player_units = game_state.units["player"]
+    current_unit = player_units[state["unit_idx"]] if state["unit_idx"] < len(player_units) else None
+
+    if request.method == "POST" and current_unit:
+        if "manual" in request.form:
+            state["manual"] = True
+            state["model_positions"] = []
+        elif "confirm" in request.form:
+            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+
+            if state.get("manual"):
+                if len(state["model_positions"]) == len(current_unit.models):
+                    for i, (mx, my) in enumerate(state["model_positions"]):
+                        current_unit.models[i].x = mx
+                        current_unit.models[i].y = my
+                    current_unit.x, current_unit.y = state["model_positions"][0]
+                    valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+                    if valid and board.place_unit(current_unit):
+                        game_state.log_message(f"Placed {current_unit.name}")
+                        state = {"unit_idx": state["unit_idx"] + 1, "pos": None, "manual": False, "model_positions": []}
+                else:
+                    pass
+            else:
+                if state.get("pos") is not None:
+                    zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+                    center_y = sum(y for _, y in zone_list) / len(zone_list)
+                    orientation = 1 if center_y < board.height / 2 else -1
+                    offsets = _triangle_offsets(len(current_unit.models), orientation)
+                    for i, (dx, dy) in enumerate(offsets):
+                        current_unit.models[i].x = state["pos"][0] + dx
+                        current_unit.models[i].y = state["pos"][1] + dy
+                    current_unit.x, current_unit.y = state["pos"]
+                    valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+                    if valid and board.place_unit(current_unit):
+                        game_state.log_message(f"Placed {current_unit.name}")
+                        state = {"unit_idx": state["unit_idx"] + 1, "pos": None, "manual": False, "model_positions": []}
+        elif "pos" in request.form:
+            x_str, y_str = request.form.get("pos").split(",")
+            x, y = int(x_str), int(y_str)
+            if state.get("manual"):
+                idx = len(state["model_positions"])
+                if idx < len(current_unit.models):
+                    state["model_positions"].append((x, y))
+            else:
+                state["pos"] = (x, y)
+
+    session["unit_state"] = state
+    if state["unit_idx"] >= len(game_state.units["player"]):
+        ai_zone = attacker_zone if player_zone is defender_zone else defender_zone
+        deployment.deploy_units(board, game_state.units["ai"], ai_zone, player_zone, game_state.map_layout or "straight", "AI", get_input=lambda _: "", log=game_state.log_message)
+        session["unit_done"] = True
+        _save_game(game)
+        return redirect("/game")
+
+    preview = []
+    if current_unit:
+        if state.get("manual"):
+            for i, (mx, my) in enumerate(state.get("model_positions", [])):
+                preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
+            if state.get("pos") is not None and len(state.get("model_positions", [])) < len(current_unit.models):
+                idx = len(state["model_positions"])
+                preview.extend(Model(state["pos"][0], state["pos"][1], base_diameter=current_unit.models[idx].base_diameter).get_occupied_squares())
+        elif state.get("pos") is not None:
+            zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            center_y = sum(y for _, y in zone_list) / len(zone_list)
+            orientation = 1 if center_y < board.height / 2 else -1
+            offsets = _triangle_offsets(len(current_unit.models), orientation)
+            for i, (dx, dy) in enumerate(offsets):
+                mx, my = state["pos"][0] + dx, state["pos"][1] + dy
+                preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
+
+    display_grid = build_display_grid(game_state, board, preview=preview)
+
+    prompt_label = f"Place {current_unit.name}" if current_unit else "All units placed"
+
+    zone_color = "#d0e6ff" if player_zone is defender_zone else "#ffd0d0"
+    zone_name = "Blue" if player_zone is defender_zone else "Red"
+
+    response = render_template(
+        "unit_placement.html",
+        grid=display_grid,
+        width=board.width,
+        height=board.height,
+        prompt_label=prompt_label,
+        messages=game_state.messages,
+        zone_color=zone_color,
+        zone_name=zone_name,
+        manual=state.get("manual"),
     )
     _save_game(game)
     return response
