@@ -1,4 +1,9 @@
-from flask import Flask, render_template, request, redirect, session
+try:
+    from flask import Flask, render_template, request, redirect, session
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Flask is required to run the web interface. Install dependencies via 'pip install -r requirements.txt'."
+    ) from exc
 import base64
 import pickle
 import random
