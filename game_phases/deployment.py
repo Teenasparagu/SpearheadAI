@@ -324,7 +324,10 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
     """Check leader tile only before generating a formation."""
     if (x, y) not in set(zone):
         return False, "Outside deployment zone"
-    if x < 12 or y < 12 or x >= board.width - 12 or y >= board.height - 12:
+    # Allow placement closer to the board edge than units, but still keep a
+    # minimal buffer so models don't start hanging off the map. Six squares
+    # gives players room to position leaders while leaving space for formations.
+    if x < 6 or y < 6 or x >= board.width - 6 or y >= board.height - 6:
         return False, "Too close to board edge"
     if board.grid[y][x] != "-":
         return False, "Tile occupied"
@@ -375,7 +378,9 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
         for px, py in squares:
             if not (0 <= px < board.width and 0 <= py < board.height):
                 return False, "Out of bounds"
-            if px < 12 or py < 12 or px >= board.width - 12 or py >= board.height - 12:
+            # Models need a little breathing room from the table edge but can be
+            # closer than the earlier 12 square requirement.
+            if px < 6 or py < 6 or px >= board.width - 6 or py >= board.height - 6:
                 return False, "Too close to board edge"
             if board.grid[py][px] != "-":
                 return False, "Tile occupied"
