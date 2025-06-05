@@ -184,126 +184,14 @@ def get_deployment_zones(board, map_type):
     return defender_zone, attacker_zone
 
 def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
-    zone_name = "Player 1" if team == 1 else "Player 2"
-    log(f"{zone_name} Terrain Deployment")
-
-    for name, base_shape in [("Rectangle Wall", RECTANGLE_WALL), ("L-Shaped Wall", L_SHAPE_WALL)]:
-        if team == 2:
-            log(f"AI is placing {name}...")
-            attempts = 100
-            directions = list(rotate_shape.__globals__["DIRECTION_VECTORS"].keys())
-            for _ in range(attempts):
-                x, y = random.choice(zone)
-                direction = random.choice(directions)
-                rotated = rotate_shape(base_shape, direction)
-                legal, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
-
-                if legal:
-                    if board.place_terrain_piece(x, y, rotated):
-                        log(f"✅ AI placed {name} at ({x}, {y}) facing {direction}")
-                        break
-            else:
-                log(f"❌ AI failed to place {name} after 100 attempts.")
-        else:
-            while True:
-                user_input = get_input(f"Place {name} - Enter 'x y direction' or 'skip':").strip().lower()
-                if user_input == "skip":
-                    log(f"Skipped placing {name}.")
-                    break
-                try:
-                    parts = user_input.upper().split()
-                    if len(parts) != 3:
-                        raise ValueError("Invalid format. Use: x y direction")
-                    x, y = int(parts[0]), int(parts[1])
-                    direction = parts[2]
-                    rotated = rotate_shape(base_shape, direction)
-                    valid, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
-                    if valid:
-                        if board.place_terrain_piece(x, y, rotated):
-                            log(f"✅ Placed {name} at ({x},{y}) facing {direction}")
-                            break
-                        else:
-                            log("❌ Unexpected error: placement failed despite passing checks.")
-                    else:
-                        log("❌ Placement invalid.")
-                except Exception as e:
-                    log(f"⚠️ Error: {e}")
+    """Placeholder for terrain deployment."""
+    # This logic has been intentionally stripped out.
+    return None
 
 def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player_label, get_input, log):
-    zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if territory_bounds(i, j)]
-    enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_bounds(i, j)]
-    zone_list = zone_coords
-    center_y = sum(y for _, y in zone_list) / len(zone_list)
-    orientation = 1 if center_y < board.height / 2 else -1
-
-    for unit in units:
-        if player_label.lower() == "ai":
-            placed = False
-            attempts = 100
-            while not placed and attempts > 0:
-                x = random.randint(0, board.width - 1)
-                y = random.randint(0, board.height - 1)
-                if territory_bounds(x, y):
-                    offsets = formation_offsets("box", len(unit.models), orientation)
-                    for i, (dx, dy) in enumerate(offsets):
-                        unit.models[i].x = x + dx
-                        unit.models[i].y = y + dy
-                    unit.x, unit.y = x, y
-                    valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
-                    if valid and board.place_unit(unit):
-                        placed = True
-                attempts -= 1
-            if not placed:
-                log(f"⚠ AI could not place {unit.name} after 100 attempts.")
-        else:
-            while True:
-                try:
-                    pos = get_input(f"Placing {unit.name} leader x y:").split()
-                    x, y = map(int, pos)
-                    if not territory_bounds(x, y):
-                        log("❌ Not within your deployment zone.")
-                        continue
-                    ok, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
-                    if not ok:
-                        log(f"❌ Placement invalid: {reason}")
-                        continue
-                    formation = get_input("Choose formation (box/triangle/circle):").strip().lower()
-                    offsets = formation_offsets(formation, len(unit.models), orientation)
-                    for i, (dx, dy) in enumerate(offsets):
-                        unit.models[i].x = x + dx
-                        unit.models[i].y = y + dy
-                    unit.x, unit.y = x, y
-                    valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
-                    if not valid:
-                        log(f"❌ Placement invalid: {reason}")
-                        continue
-                    log("Proposed positions:")
-                    for i, m in enumerate(unit.models):
-                        log(f"  Model {i} -> ({m.x}, {m.y})")
-                    confirm = get_input("Confirm placement? (y/n):").strip().lower()
-                    if confirm.startswith("y"):
-                        board.place_unit(unit)
-                        log(f"Placed {unit.name}")
-                        break
-                    manual = get_input("Manual placement instead? (y/n):").strip().lower()
-                    if not manual.startswith("y"):
-                        continue
-                    positions = []
-                    for idx in range(len(unit.models)):
-                        mx, my = map(int, get_input(f"Model {idx} x y:").split())
-                        positions.append((mx, my))
-                    for idx, (mx, my) in enumerate(positions):
-                        unit.models[idx].x = mx
-                        unit.models[idx].y = my
-                    unit.x, unit.y = positions[0]
-                    valid, reason = is_valid_unit_placement(unit.x, unit.y, unit, board, zone_coords, enemy_coords)
-                    if valid and board.place_unit(unit):
-                        log(f"Placed {unit.name}")
-                        break
-                    else:
-                        log(f"❌ Manual placement invalid: {reason}")
-                except ValueError:
-                    log("Invalid input. Use format: x y (e.g., 12 8)")
+    """Placeholder for unit deployment."""
+    # All deployment rules removed; units should be placed externally.
+    return None
 
 def is_within_zone(x, y, rotated_shape, zone):
     zone_set = set(zone)
@@ -326,20 +214,7 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
 
 
 def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
-    zone_set = set(zone)
-    enemy_set = set(enemy_zone)
-    for dx, dy in rotated_shape:
-        px, py = x + dx, y + dy
-        if (px, py) not in zone_set:
-            return False, (px, py)
-        for ex, ey in enemy_set:
-            if math.hypot(px - ex, py - ey) < 6:
-                return False, (px, py)
-        if board.grid[py][px] == TILE_OBJECTIVE:
-            return False, (px, py)
-        for tx, ty in board.terrain:
-            if math.hypot(px - tx, py - ty) < 12:
-                return False, (px, py)
+    """Placeholder terrain placement validation."""
     return True, None
 
 def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):

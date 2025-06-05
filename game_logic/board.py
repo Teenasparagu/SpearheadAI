@@ -28,27 +28,11 @@ class Board:
         self.grid[y][x] = TILE_OBJECTIVE
 
     def is_valid_terrain_location(self, tiles):
-        for x, y in tiles:
-            if not (6 <= x < self.width - 6 and 6 <= y < self.height - 6):
-                return False
-            for ox, oy in self.terrain:
-                if math.hypot(x - ox, y - oy) < 6:
-                    return False
-            for obj in self.objectives:
-                if math.hypot(x - obj.x, y - obj.y) < 12:
-                    return False
+        """Placeholder terrain validation."""
         return True
 
     def place_terrain_piece(self, x, y, rotated_shape):
-        placed_tiles = [(x + dx, y + dy) for dx, dy in rotated_shape]
-        for px, py in placed_tiles:
-            if not (0 <= px < self.width and 0 <= py < self.height):
-                return False
-            if self.grid[py][px] != "-":
-                return False
-        for px, py in placed_tiles:
-            self.terrain.append((px, py))
-            self.grid[py][px] = "T"
+        """Terrain placement removed."""
         return True
 
     def place_unit(self, unit: Unit):
