@@ -288,3 +288,35 @@ def ai_movement_phase(board, ai_units, get_input, log):
         else:
             log(f"{unit.name} couldn't find a valid direction to move.")
 
+
+# Additional helpers for web interface movement
+
+
+def move_unit_to(unit, board, dest_x, dest_y, move_range, log):
+    """Move a unit to an explicit destination, enforcing distance and proximity checks."""
+    if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
+        log("Move out of bounds!")
+        return False
+
+    dx = dest_x - unit.x
+    dy = dest_y - unit.y
+    distance = math.sqrt(dx**2 + dy**2)
+    if distance > move_range:
+        log(f"{unit.name} can't move that far (max {move_range / 2:.1f} inches).")
+        return False
+
+    if is_in_combat(dest_x, dest_y, board, unit.team):
+        log("Destination too close to an enemy unit.")
+        return False
+
+    path = board.get_path(unit.x, unit.y, dest_x, dest_y)
+    blocked, blocked_tile = board.is_path_blocked(path, (unit.x, unit.y), unit)
+    if blocked:
+        log(f"Path is blocked at {blocked_tile}.")
+        return False
+
+    board.grid[unit.y][unit.x] = "-"
+    unit.x, unit.y = dest_x, dest_y
+    unit.models[0].x, unit.models[0].y = dest_x, dest_y
+    log(f"{unit.name} moved to ({dest_x}, {dest_y}).")
+    return True
