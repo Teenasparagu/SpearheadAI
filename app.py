@@ -545,12 +545,26 @@ def unit_placement():
                         current_unit.models[i].x = mx
                         current_unit.models[i].y = my
                     current_unit.x, current_unit.y = state["model_positions"][0]
-                    valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+                    valid, _ = deployment.is_valid_unit_placement(
+                        current_unit.x,
+                        current_unit.y,
+                        current_unit,
+                        board,
+                        zone_coords,
+                        enemy_coords,
+                    )
                     if valid and board.place_unit(current_unit):
                         game_state.log_message(f"Placed {current_unit.name}")
-                        state = {"unit_idx": state["unit_idx"] + 1, "pos": None, "manual": False, "model_positions": []}
+                        state = {
+                            "unit_idx": state["unit_idx"] + 1,
+                            "pos": None,
+                            "manual": False,
+                            "model_positions": [],
+                        }
+                    else:
+                        game_state.log_message("Invalid placement.")
                 else:
-                    pass
+                    game_state.log_message("Select positions for all models first.")
             else:
                 if state.get("pos") is not None:
                     zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
@@ -564,7 +578,14 @@ def unit_placement():
                     valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
                     if valid and board.place_unit(current_unit):
                         game_state.log_message(f"Placed {current_unit.name}")
-                        state = {"unit_idx": state["unit_idx"] + 1, "pos": None, "manual": False, "model_positions": []}
+                        state = {
+                            "unit_idx": state["unit_idx"] + 1,
+                            "pos": None,
+                            "manual": False,
+                            "model_positions": [],
+                        }
+                    else:
+                        game_state.log_message("Invalid placement.")
         elif "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
