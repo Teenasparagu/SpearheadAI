@@ -15,6 +15,7 @@ from game_phases.deployment import (
     deploy_terrain,
     is_within_zone,
     is_clear_of_objectives,
+    is_valid_leader_position,
     formation_offsets,
 )
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
@@ -554,8 +555,14 @@ def unit_placement():
         if step == "select_pos" and "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
-            state["pos"] = (x, y)
-            state["step"] = "choose_form"
+            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+            valid, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
+            if valid:
+                state["pos"] = (x, y)
+                state["step"] = "choose_form"
+            else:
+                game_state.log_message(f"Invalid placement: {reason}")
         elif step == "choose_form" and "formation" in request.form:
             state["formation"] = request.form.get("formation")
             zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
@@ -570,12 +577,12 @@ def unit_placement():
                 current_unit.models[i].x = mx
                 current_unit.models[i].y = my
             current_unit.x, current_unit.y = auto_positions[0]
-            valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+            valid, reason = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
             if valid:
                 state["auto_positions"] = auto_positions
                 state["step"] = "review"
             else:
-                game_state.log_message("Invalid placement.")
+                game_state.log_message(f"Invalid placement: {reason}")
                 state["step"] = "select_pos"
                 state["pos"] = None
                 state["formation"] = None
@@ -586,7 +593,7 @@ def unit_placement():
                 current_unit.models[i].x = mx
                 current_unit.models[i].y = my
             current_unit.x, current_unit.y = state.get("auto_positions", [(0,0)])[0]
-            valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+            valid, reason = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
             if valid and board.place_unit(current_unit):
                 game_state.log_message(f"Placed {current_unit.name}")
                 state = {
@@ -598,7 +605,7 @@ def unit_placement():
                     "model_positions": [],
                 }
             else:
-                game_state.log_message("Invalid placement.")
+                game_state.log_message(f"Invalid placement: {reason}")
         elif step == "review" and "manual" in request.form:
             state["manual"] = True
             state["model_positions"] = []
@@ -611,7 +618,7 @@ def unit_placement():
                     current_unit.models[i].x = mx
                     current_unit.models[i].y = my
                 current_unit.x, current_unit.y = state["model_positions"][0]
-                valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+                valid, reason = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
                 if valid and board.place_unit(current_unit):
                     game_state.log_message(f"Placed {current_unit.name}")
                     state = {
@@ -623,7 +630,7 @@ def unit_placement():
                         "model_positions": [],
                     }
                 else:
-                    game_state.log_message("Invalid placement.")
+                    game_state.log_message(f"Invalid placement: {reason}")
             else:
                 game_state.log_message("Select positions for all models first.")
         elif step == "manual" and "pos" in request.form:

@@ -263,15 +263,19 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                     if not territory_bounds(x, y):
                         log("❌ Not within your deployment zone.")
                         continue
+                    ok, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
+                    if not ok:
+                        log(f"❌ Placement invalid: {reason}")
+                        continue
                     formation = get_input("Choose formation (box/triangle/circle):").strip().lower()
                     offsets = formation_offsets(formation, len(unit.models), orientation)
                     for i, (dx, dy) in enumerate(offsets):
                         unit.models[i].x = x + dx
                         unit.models[i].y = y + dy
                     unit.x, unit.y = x, y
-                    valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
+                    valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
                     if not valid:
-                        log("❌ Placement invalid.")
+                        log(f"❌ Placement invalid: {reason}")
                         continue
                     log("Proposed positions:")
                     for i, m in enumerate(unit.models):
@@ -292,12 +296,12 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                         unit.models[idx].x = mx
                         unit.models[idx].y = my
                     unit.x, unit.y = positions[0]
-                    valid, _ = is_valid_unit_placement(unit.x, unit.y, unit, board, zone_coords, enemy_coords)
+                    valid, reason = is_valid_unit_placement(unit.x, unit.y, unit, board, zone_coords, enemy_coords)
                     if valid and board.place_unit(unit):
                         log(f"Placed {unit.name}")
                         break
                     else:
-                        log("❌ Manual placement invalid.")
+                        log(f"❌ Manual placement invalid: {reason}")
                 except ValueError:
                     log("Invalid input. Use format: x y (e.g., 12 8)")
 
@@ -313,6 +317,23 @@ def is_clear_of_objectives(x, y, rotated_shape, board):
         px, py = x + dx, y + dy
         if board.grid[py][px] == TILE_OBJECTIVE:
             return False, (px, py)
+    return True, None
+
+
+def is_valid_leader_position(x, y, board, zone, enemy_zone):
+    """Check leader tile only before generating a formation."""
+    if (x, y) not in set(zone):
+        return False, "Outside deployment zone"
+    if x < 12 or y < 12 or x >= board.width - 12 or y >= board.height - 12:
+        return False, "Too close to board edge"
+    if board.grid[y][x] != "-":
+        return False, "Tile occupied"
+    for ex, ey in enemy_zone:
+        if math.hypot(x - ex, y - ey) < 12:
+            return False, "Too close to enemy zone"
+    for tx, ty in board.terrain:
+        if math.hypot(x - tx, y - ty) < 12:
+            return False, "Too close to terrain"
     return True, None
 
 
@@ -336,6 +357,7 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     return True, None
 
 def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
+    """Validate a unit placement. Returns (bool, reason)."""
     zone_set = set(zone)
     enemy_set = set(enemy_zone)
 
@@ -352,14 +374,16 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
     for _, _, squares in new_positions:
         for px, py in squares:
             if not (0 <= px < board.width and 0 <= py < board.height):
-                return False, (px, py)
+                return False, "Out of bounds"
+            if px < 12 or py < 12 or px >= board.width - 12 or py >= board.height - 12:
+                return False, "Too close to board edge"
             if board.grid[py][px] != "-":
-                return False, (px, py)
+                return False, "Tile occupied"
             if (px, py) not in zone_set:
-                return False, (px, py)
+                return False, "Outside deployment zone"
             for ex, ey in enemy_set:
                 if math.hypot(px - ex, py - ey) < 12:
-                    return False, (px, py)
+                    return False, "Too close to enemy zone"
 
     for i, (mx, my, _) in enumerate(new_positions):
         coherent = False
@@ -368,6 +392,6 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
                 coherent = True
                 break
         if not coherent:
-            return False, (mx, my)
+            return False, "Models not coherent"
 
     return True, None
