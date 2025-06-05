@@ -10,6 +10,7 @@ from game_phases.deployment import (
     deploy_terrain,
     is_within_zone,
     is_clear_of_objectives,
+    formation_offsets,
 )
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape
 from game_phases.movement_phase import move_unit_to
@@ -19,21 +20,16 @@ from game_logic.utils import _simple_deploy_units
 
 
 def _triangle_offsets(num, orientation):
-    """Return offsets for models in a triangle behind the leader."""
-    offsets = [(0, 0)]
-    placed = 1
-    row = 2
-    y = -orientation
-    while placed < num:
-        start_x = -(row - 1)
-        for i in range(row):
-            if placed >= num:
-                break
-            offsets.append((start_x + 2 * i, y))
-            placed += 1
-        row += 1
-        y -= orientation
-    return offsets
+    """Wrapper using deployment's triangle formation."""
+    return formation_offsets("triangle", num, orientation)
+
+
+def _rectangle_offsets(num, orientation):
+    return formation_offsets("box", num, orientation)
+
+
+def _circle_offsets(num, orientation):
+    return formation_offsets("circle", num, orientation)
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
@@ -266,7 +262,14 @@ def game_view():
             "pos": None,
             "dir_idx": 0
         }
-        session["unit_state"] = {"unit_idx": 0, "pos": None, "manual": False, "model_positions": []}
+        session["unit_state"] = {
+            "unit_idx": 0,
+            "step": "select_pos",
+            "pos": None,
+            "formation": None,
+            "manual": False,
+            "model_positions": [],
+        }
         input_index = 0
         input_sequence.clear()
         factions = deployment.list_factions()
@@ -510,7 +513,17 @@ def unit_placement():
     game = _load_game()
     game_state = game.game_state
     board = game.board
-    state = session.get("unit_state", {"unit_idx": 0, "pos": None, "manual": False, "model_positions": []})
+    state = session.get(
+        "unit_state",
+        {
+            "unit_idx": 0,
+            "step": "select_pos",
+            "pos": None,
+            "formation": None,
+            "manual": False,
+            "model_positions": [],
+        },
+    )
 
     defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
     player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
@@ -532,69 +545,88 @@ def unit_placement():
     current_unit = player_units[state["unit_idx"]] if state["unit_idx"] < len(player_units) else None
 
     if request.method == "POST" and current_unit:
-        if "manual" in request.form:
-            state["manual"] = True
-            state["model_positions"] = []
-        elif "confirm" in request.form:
-            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
-
-            if state.get("manual"):
-                if len(state["model_positions"]) == len(current_unit.models):
-                    for i, (mx, my) in enumerate(state["model_positions"]):
-                        current_unit.models[i].x = mx
-                        current_unit.models[i].y = my
-                    current_unit.x, current_unit.y = state["model_positions"][0]
-                    valid, _ = deployment.is_valid_unit_placement(
-                        current_unit.x,
-                        current_unit.y,
-                        current_unit,
-                        board,
-                        zone_coords,
-                        enemy_coords,
-                    )
-                    if valid and board.place_unit(current_unit):
-                        game_state.log_message(f"Placed {current_unit.name}")
-                        state = {
-                            "unit_idx": state["unit_idx"] + 1,
-                            "pos": None,
-                            "manual": False,
-                            "model_positions": [],
-                        }
-                    else:
-                        game_state.log_message("Invalid placement.")
-                else:
-                    game_state.log_message("Select positions for all models first.")
-            else:
-                if state.get("pos") is not None:
-                    zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-                    center_y = sum(y for _, y in zone_list) / len(zone_list)
-                    orientation = 1 if center_y < board.height / 2 else -1
-                    offsets = _triangle_offsets(len(current_unit.models), orientation)
-                    for i, (dx, dy) in enumerate(offsets):
-                        current_unit.models[i].x = state["pos"][0] + dx
-                        current_unit.models[i].y = state["pos"][1] + dy
-                    current_unit.x, current_unit.y = state["pos"]
-                    valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
-                    if valid and board.place_unit(current_unit):
-                        game_state.log_message(f"Placed {current_unit.name}")
-                        state = {
-                            "unit_idx": state["unit_idx"] + 1,
-                            "pos": None,
-                            "manual": False,
-                            "model_positions": [],
-                        }
-                    else:
-                        game_state.log_message("Invalid placement.")
-        elif "pos" in request.form:
+        step = state.get("step", "select_pos")
+        if step == "select_pos" and "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
-            if state.get("manual"):
-                idx = len(state["model_positions"])
-                if idx < len(current_unit.models):
-                    state["model_positions"].append((x, y))
+            state["pos"] = (x, y)
+            state["step"] = "choose_form"
+        elif step == "choose_form" and "formation" in request.form:
+            state["formation"] = request.form.get("formation")
+            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+            center_y = sum(y for _, y in zone_coords) / len(zone_coords)
+            orientation = 1 if center_y < board.height / 2 else -1
+            offsets = formation_offsets(state["formation"], len(current_unit.models), orientation)
+            auto_positions = []
+            for i, (dx, dy) in enumerate(offsets):
+                mx, my = state["pos"][0] + dx, state["pos"][1] + dy
+                auto_positions.append((mx, my))
+                current_unit.models[i].x = mx
+                current_unit.models[i].y = my
+            current_unit.x, current_unit.y = auto_positions[0]
+            valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+            if valid:
+                state["auto_positions"] = auto_positions
+                state["step"] = "review"
             else:
-                state["pos"] = (x, y)
+                game_state.log_message("Invalid placement.")
+                state["step"] = "select_pos"
+                state["pos"] = None
+                state["formation"] = None
+        elif step == "review" and "confirm" in request.form:
+            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+            for i, (mx, my) in enumerate(state.get("auto_positions", [])):
+                current_unit.models[i].x = mx
+                current_unit.models[i].y = my
+            current_unit.x, current_unit.y = state.get("auto_positions", [(0,0)])[0]
+            valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+            if valid and board.place_unit(current_unit):
+                game_state.log_message(f"Placed {current_unit.name}")
+                state = {
+                    "unit_idx": state["unit_idx"] + 1,
+                    "step": "select_pos",
+                    "pos": None,
+                    "formation": None,
+                    "manual": False,
+                    "model_positions": [],
+                }
+            else:
+                game_state.log_message("Invalid placement.")
+        elif step == "review" and "manual" in request.form:
+            state["manual"] = True
+            state["model_positions"] = []
+            state["step"] = "manual"
+        elif step == "manual" and "confirm" in request.form:
+            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+            if len(state["model_positions"]) == len(current_unit.models):
+                for i, (mx, my) in enumerate(state["model_positions"]):
+                    current_unit.models[i].x = mx
+                    current_unit.models[i].y = my
+                current_unit.x, current_unit.y = state["model_positions"][0]
+                valid, _ = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
+                if valid and board.place_unit(current_unit):
+                    game_state.log_message(f"Placed {current_unit.name}")
+                    state = {
+                        "unit_idx": state["unit_idx"] + 1,
+                        "step": "select_pos",
+                        "pos": None,
+                        "formation": None,
+                        "manual": False,
+                        "model_positions": [],
+                    }
+                else:
+                    game_state.log_message("Invalid placement.")
+            else:
+                game_state.log_message("Select positions for all models first.")
+        elif step == "manual" and "pos" in request.form:
+            x_str, y_str = request.form.get("pos").split(",")
+            x, y = int(x_str), int(y_str)
+            idx = len(state["model_positions"])
+            if idx < len(current_unit.models):
+                state["model_positions"].append((x, y))
 
     session["unit_state"] = state
     if state["unit_idx"] >= len(game_state.units["player"]):
@@ -606,20 +638,18 @@ def unit_placement():
 
     preview = []
     if current_unit:
-        if state.get("manual"):
+        step = state.get("step")
+        if step == "manual":
             for i, (mx, my) in enumerate(state.get("model_positions", [])):
                 preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
             if state.get("pos") is not None and len(state.get("model_positions", [])) < len(current_unit.models):
                 idx = len(state["model_positions"])
                 preview.extend(Model(state["pos"][0], state["pos"][1], base_diameter=current_unit.models[idx].base_diameter).get_occupied_squares())
-        elif state.get("pos") is not None:
-            zone_list = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-            center_y = sum(y for _, y in zone_list) / len(zone_list)
-            orientation = 1 if center_y < board.height / 2 else -1
-            offsets = _triangle_offsets(len(current_unit.models), orientation)
-            for i, (dx, dy) in enumerate(offsets):
-                mx, my = state["pos"][0] + dx, state["pos"][1] + dy
+        elif step == "review" and state.get("auto_positions"):
+            for i, (mx, my) in enumerate(state.get("auto_positions", [])):
                 preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
+        elif step == "choose_form" and state.get("pos") is not None:
+            preview.extend(Model(state["pos"][0], state["pos"][1], base_diameter=current_unit.models[0].base_diameter).get_occupied_squares())
 
     display_grid = build_display_grid(game_state, board, preview=preview)
 
@@ -638,6 +668,7 @@ def unit_placement():
         zone_color=zone_color,
         zone_name=zone_name,
         manual=state.get("manual"),
+        step=state.get("step"),
     )
     _save_game(game)
     return response
