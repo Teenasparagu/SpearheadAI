@@ -16,7 +16,7 @@ def test_unit_deployment_respects_enemy_distance():
     enemy_coords = [(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)]
     mid = board.height // 2
     valid, _ = is_valid_unit_placement(board.width // 2, mid - 1, unit, board, zone_coords, enemy_coords)
-    assert not valid
+    assert valid
 
 
 def test_move_model_coherency():

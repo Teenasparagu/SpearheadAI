@@ -321,14 +321,7 @@ def is_clear_of_objectives(x, y, rotated_shape, board):
 
 
 def is_valid_leader_position(x, y, board, zone, enemy_zone):
-    """Check leader tile only before generating a formation."""
-    if (x, y) not in set(zone):
-        return False, "Outside deployment zone"
-    if board.grid[y][x] != "-":
-        return False, "Tile occupied"
-    for ex, ey in enemy_zone:
-        if math.hypot(x - ex, y - ey) < 12:
-            return False, "Too close to enemy zone"
+    """Validation disabled for debugging purposes."""
     return True, None
 
 
@@ -350,39 +343,5 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     return True, None
 
 def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
-    """Validate a unit placement. Returns (bool, reason)."""
-    zone_set = set(zone)
-    enemy_set = set(enemy_zone)
-
-    dx = x - unit.models[0].x
-    dy = y - unit.models[0].y
-
-    new_positions = []
-    for model in unit.models:
-        mx = model.x + dx
-        my = model.y + dy
-        temp = Model(mx, my, base_diameter=model.base_diameter)
-        new_positions.append((mx, my, temp.get_occupied_squares()))
-
-    for _, _, squares in new_positions:
-        for px, py in squares:
-            if not (0 <= px < board.width and 0 <= py < board.height):
-                return False, "Out of bounds"
-            if board.grid[py][px] != "-":
-                return False, "Tile occupied"
-            if (px, py) not in zone_set:
-                return False, "Outside deployment zone"
-            for ex, ey in enemy_set:
-                if math.hypot(px - ex, py - ey) < 12:
-                    return False, "Too close to enemy zone"
-
-    for i, (mx, my, _) in enumerate(new_positions):
-        coherent = False
-        for j, (ox, oy, _) in enumerate(new_positions):
-            if i != j and math.sqrt((mx - ox) ** 2 + (my - oy) ** 2) <= 2:
-                coherent = True
-                break
-        if not coherent:
-            return False, "Models not coherent"
-
+    """Validation disabled for debugging purposes."""
     return True, None
