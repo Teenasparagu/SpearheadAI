@@ -27,3 +27,22 @@ def test_move_model_coherency():
     assert not board.move_model(unit, 1, unit.models[0].x + 3, unit.models[0].y)
     assert board.move_model(unit, 1, unit.models[0].x + 2, unit.models[0].y)
 
+
+def test_triangle_offsets_coherent_placement():
+    board = Board()
+    unit = Unit(
+        "Test",
+        "stormcast",
+        team=1,
+        num_models=3,
+        unit_data={"num_models": 3, "move_range": 6, "base_width": 1.0, "base_height": 1.0},
+    )
+    from app import _triangle_offsets
+
+    offsets = _triangle_offsets(len(unit.models), orientation=1)
+    for i, (dx, dy) in enumerate(offsets):
+        unit.models[i].x = unit.x + dx
+        unit.models[i].y = unit.y + dy
+
+    assert board.place_unit(unit)
+

@@ -23,7 +23,7 @@ def _triangle_offsets(num, orientation):
     offsets = [(0, 0)]
     placed = 1
     row = 2
-    y = -orientation * 2
+    y = -orientation
     while placed < num:
         start_x = -(row - 1)
         for i in range(row):
@@ -32,7 +32,7 @@ def _triangle_offsets(num, orientation):
             offsets.append((start_x + 2 * i, y))
             placed += 1
         row += 1
-        y -= orientation * 2
+        y -= orientation
     return offsets
 
 app = Flask(__name__)
