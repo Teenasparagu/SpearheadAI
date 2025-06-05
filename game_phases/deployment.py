@@ -94,6 +94,69 @@ def choose_deployment_map(get_input, log):
         else:
             log("Invalid choice.")
 
+
+def _triangle_offsets(num, orientation):
+    """Offsets for a triangle formation behind the leader."""
+    offsets = [(0, 0)]
+    placed = 1
+    row = 2
+    y = -orientation
+    while placed < num:
+        start_x = -(row - 1)
+        for i in range(row):
+            if placed >= num:
+                break
+            offsets.append((start_x + 2 * i, y))
+            placed += 1
+        row += 1
+        y -= orientation
+    return offsets
+
+
+def _rectangle_offsets(num, orientation):
+    """Offsets for a simple rectangular block behind the leader."""
+    offsets = [(0, 0)]
+    cols = math.ceil(math.sqrt(num))
+    rows = math.ceil(num / cols)
+    placed = 1
+    for r in range(rows):
+        if placed >= num:
+            break
+        y = -(r + 1) * orientation
+        start_x = -(cols - 1)
+        for c in range(cols):
+            if placed >= num:
+                break
+            offsets.append((start_x + 2 * c, y))
+            placed += 1
+    return offsets
+
+
+def _circle_offsets(num, orientation):
+    """Offsets spreading models in a semicircle behind the leader."""
+    offsets = [(0, 0)]
+    spiral = generate_spiral_offsets(radius=6)
+    for dx, dy in spiral[1:]:
+        if len(offsets) >= num:
+            break
+        if -orientation * dy >= 0:
+            offsets.append((dx, dy))
+    for dx, dy in spiral[1:]:
+        if len(offsets) >= num:
+            break
+        if -orientation * dy < 0:
+            offsets.append((dx, dy))
+    return offsets[:num]
+
+
+def formation_offsets(formation, num_models, orientation):
+    formation = (formation or "triangle").lower()
+    if formation.startswith("box") or formation.startswith("rect"):
+        return _rectangle_offsets(num_models, orientation)
+    if formation.startswith("circle"):
+        return _circle_offsets(num_models, orientation)
+    return _triangle_offsets(num_models, orientation)
+
 def get_deployment_zones(board, map_type):
     if map_type == "straight":
         mid = board.height // 2
@@ -169,6 +232,10 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
 def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player_label, get_input, log):
     zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if territory_bounds(i, j)]
     enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_bounds(i, j)]
+    zone_list = zone_coords
+    center_y = sum(y for _, y in zone_list) / len(zone_list)
+    orientation = 1 if center_y < board.height / 2 else -1
+
     for unit in units:
         if player_label.lower() == "ai":
             placed = False
@@ -177,16 +244,13 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                 x = random.randint(0, board.width - 1)
                 y = random.randint(0, board.height - 1)
                 if territory_bounds(x, y):
+                    offsets = formation_offsets("box", len(unit.models), orientation)
+                    for i, (dx, dy) in enumerate(offsets):
+                        unit.models[i].x = x + dx
+                        unit.models[i].y = y + dy
+                    unit.x, unit.y = x, y
                     valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
-                    if valid:
-                        unit.x = x
-                        unit.y = y
-                        for model in unit.models:
-                            dx = x - unit.models[0].x
-                            dy = y - unit.models[0].y
-                            model.x += dx
-                            model.y += dy
-                        board.place_unit(unit)
+                    if valid and board.place_unit(unit):
                         placed = True
                 attempts -= 1
             if not placed:
@@ -194,18 +258,50 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
         else:
             while True:
                 try:
-                    x, y = map(int, get_input(f"Placing {unit.name} (leader model): Enter x y within your deployment zone:").split())
-                    if territory_bounds(x, y):
-                        valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
-                        if valid:
-                            unit.x = x
-                            unit.y = y
-                            board.place_unit(unit)
-                            break
-                        else:
-                            log("❌ Placement invalid.")
-                    else:
+                    pos = get_input(f"Placing {unit.name} leader x y:").split()
+                    x, y = map(int, pos)
+                    if not territory_bounds(x, y):
                         log("❌ Not within your deployment zone.")
+                        continue
+                    ok, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
+                    if not ok:
+                        log(f"❌ Placement invalid: {reason}")
+                        continue
+                    formation = get_input("Choose formation (box/triangle/circle):").strip().lower()
+                    offsets = formation_offsets(formation, len(unit.models), orientation)
+                    for i, (dx, dy) in enumerate(offsets):
+                        unit.models[i].x = x + dx
+                        unit.models[i].y = y + dy
+                    unit.x, unit.y = x, y
+                    valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
+                    if not valid:
+                        log(f"❌ Placement invalid: {reason}")
+                        continue
+                    log("Proposed positions:")
+                    for i, m in enumerate(unit.models):
+                        log(f"  Model {i} -> ({m.x}, {m.y})")
+                    confirm = get_input("Confirm placement? (y/n):").strip().lower()
+                    if confirm.startswith("y"):
+                        board.place_unit(unit)
+                        log(f"Placed {unit.name}")
+                        break
+                    manual = get_input("Manual placement instead? (y/n):").strip().lower()
+                    if not manual.startswith("y"):
+                        continue
+                    positions = []
+                    for idx in range(len(unit.models)):
+                        mx, my = map(int, get_input(f"Model {idx} x y:").split())
+                        positions.append((mx, my))
+                    for idx, (mx, my) in enumerate(positions):
+                        unit.models[idx].x = mx
+                        unit.models[idx].y = my
+                    unit.x, unit.y = positions[0]
+                    valid, reason = is_valid_unit_placement(unit.x, unit.y, unit, board, zone_coords, enemy_coords)
+                    if valid and board.place_unit(unit):
+                        log(f"Placed {unit.name}")
+                        break
+                    else:
+                        log(f"❌ Manual placement invalid: {reason}")
                 except ValueError:
                     log("Invalid input. Use format: x y (e.g., 12 8)")
 
@@ -224,14 +320,27 @@ def is_clear_of_objectives(x, y, rotated_shape, board):
     return True, None
 
 
+def is_valid_leader_position(x, y, board, zone, enemy_zone):
+    """Check leader tile only before generating a formation."""
+    if (x, y) not in set(zone):
+        return False, "Outside deployment zone"
+    if board.grid[y][x] != "-":
+        return False, "Tile occupied"
+    for ex, ey in enemy_zone:
+        if math.hypot(x - ex, y - ey) < 6:
+            return False, "Too close to enemy zone"
+    for tx, ty in board.terrain:
+        if math.hypot(x - tx, y - ty) < 12:
+            return False, "Too close to terrain"
+    return True, None
+
+
 def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     zone_set = set(zone)
     enemy_set = set(enemy_zone)
     for dx, dy in rotated_shape:
         px, py = x + dx, y + dy
         if (px, py) not in zone_set:
-            return False, (px, py)
-        if not (6 <= px < board.width - 6 and 6 <= py < board.height - 6):
             return False, (px, py)
         for ex, ey in enemy_set:
             if math.hypot(px - ex, py - ey) < 6:
@@ -244,6 +353,7 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     return True, None
 
 def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
+    """Validate a unit placement. Returns (bool, reason)."""
     zone_set = set(zone)
     enemy_set = set(enemy_zone)
 
@@ -260,14 +370,14 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
     for _, _, squares in new_positions:
         for px, py in squares:
             if not (0 <= px < board.width and 0 <= py < board.height):
-                return False, (px, py)
+                return False, "Out of bounds"
             if board.grid[py][px] != "-":
-                return False, (px, py)
+                return False, "Tile occupied"
             if (px, py) not in zone_set:
-                return False, (px, py)
+                return False, "Outside deployment zone"
             for ex, ey in enemy_set:
-                if math.hypot(px - ex, py - ey) < 12:
-                    return False, (px, py)
+                if math.hypot(px - ex, py - ey) < 6:
+                    return False, "Too close to enemy zone"
 
     for i, (mx, my, _) in enumerate(new_positions):
         coherent = False
@@ -276,6 +386,6 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
                 coherent = True
                 break
         if not coherent:
-            return False, (mx, my)
+            return False, "Models not coherent"
 
     return True, None
