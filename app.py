@@ -524,12 +524,16 @@ def unit_placement():
         {
             "unit_idx": 0,
             "positions": [],
+
             "pending": None,
+
         },
     )
     if "positions" not in state:
         state["positions"] = state.pop("model_positions", [])
+
     state.setdefault("pending", None)
+
 
     defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
     player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
@@ -554,6 +558,7 @@ def unit_placement():
         if "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
+
             state["pending"] = (x, y)
         elif "confirm" in request.form:
             if state.get("pending") is not None:
@@ -609,6 +614,7 @@ def unit_placement():
                     game_state.log_message(f"Invalid position: {reason}")
                     state["pending"] = None
 
+
     session["unit_state"] = state
     if state["unit_idx"] >= len(game_state.units["player"]):
         ai_zone = attacker_zone if player_zone is defender_zone else defender_zone
@@ -623,12 +629,14 @@ def unit_placement():
             preview.extend(
                 Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares()
             )
+
         if state.get("pending") is not None and len(state["positions"]) < len(current_unit.models):
             idx = len(state["positions"])
             mx, my = state["pending"]
             preview.extend(
                 Model(mx, my, base_diameter=current_unit.models[idx].base_diameter).get_occupied_squares()
             )
+
 
     display_grid = build_display_grid(game_state, board, preview=preview)
 
@@ -646,6 +654,7 @@ def unit_placement():
         messages=game_state.messages,
         zone_color=zone_color,
         zone_name=zone_name,
+
         models_remaining=(
             len(current_unit.models)
             - len(state.get("positions", []))
@@ -654,6 +663,7 @@ def unit_placement():
         if current_unit
         else 0,
         pending=state.get("pending") is not None,
+
     )
     _save_game(game)
     return response
