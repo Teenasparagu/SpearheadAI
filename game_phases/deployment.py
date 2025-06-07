@@ -188,10 +188,46 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
     # This logic has been intentionally stripped out.
     return None
 
-def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player_label, get_input, log):
-    """Placeholder for unit deployment."""
-    # All deployment rules removed; units should be placed externally.
+def _find_valid_position(board, zone_func, offsets):
+    """Find the first board location within ``zone_func`` that fits ``offsets``."""
+    for y in range(board.height):
+        for x in range(board.width):
+            if not zone_func(x, y):
+                continue
+            valid = True
+            for dx, dy in offsets:
+                px, py = x + dx, y + dy
+                if not (0 <= px < board.width and 0 <= py < board.height):
+                    valid = False
+                    break
+                if not zone_func(px, py):
+                    valid = False
+                    break
+                if board.grid[py][px] != TILE_EMPTY:
+                    valid = False
+                    break
+            if valid:
+                return x, y
     return None
+
+
+def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player_label, get_input, log):
+    """Simple unit deployment used by the CLI, web UI and ML helpers."""
+    orientation = 1 if player_label.lower() == "player" else -1
+
+    for unit in units:
+        formation = unit.unit_data.get("formation", "triangle")
+        offsets = formation_offsets(formation, len(unit.models), orientation)
+        pos = _find_valid_position(board, territory_bounds, offsets)
+        if pos is None:
+            # fallback to origin if we can't find space
+            pos = (0, 0)
+        unit.x, unit.y = pos
+        for model, (dx, dy) in zip(unit.models, offsets):
+            model.x = unit.x + dx
+            model.y = unit.y + dy
+        board.place_unit(unit)
+        log(f"{player_label} deploys {unit.name} at {pos} using {formation} formation")
 
 def is_within_zone(x, y, rotated_shape, zone):
     zone_set = set(zone)

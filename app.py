@@ -50,6 +50,78 @@ def _save_game(game: GameEngine) -> None:
     session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
 
 
+def _apply_deployment(game: GameEngine, inputs: dict) -> None:
+    """Configure the board using prompts collected from the web UI."""
+    game_state = game.game_state
+    board = game.board
+
+    factions = deployment.list_factions()
+    faction_idx = int(inputs.get("Enter number:", "1")) - 1
+    player_faction = factions[faction_idx]
+    ai_faction = random.choice([f for f in factions if f != player_faction])
+
+    role = inputs.get("Choose attacker or defender (a/d):", "a").lower()
+    attacker, defender = ("player", "ai") if role == "a" else ("ai", "player")
+
+    battlefield = "ghyran" if inputs.get("(a/g):", "a").lower() == "g" else "aqshy"
+    board.objectives = deployment.get_objectives_for_battlefield(battlefield)
+    game_state.objectives = board.objectives
+    game_state.realm = battlefield
+
+    map_choice = inputs.get("Enter 1 or 2:", "1")
+    zone_name = "straight" if map_choice == "1" else "diagonal"
+    game_state.map_layout = zone_name
+    defender_zone, attacker_zone = deployment.get_deployment_zones(board, zone_name)
+
+    defender_team = 1 if defender == "player" else 2
+    attacker_team = 1 if attacker == "player" else 2
+
+    deployment.deploy_terrain(
+        board,
+        team=defender_team,
+        zone=[(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)],
+        enemy_zone=[(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)],
+        get_input=lambda _: "",
+        log=game_state.log_message,
+    )
+    deployment.deploy_terrain(
+        board,
+        team=attacker_team,
+        zone=[(x, y) for x in range(board.width) for y in range(board.height) if attacker_zone(x, y)],
+        enemy_zone=[(x, y) for x in range(board.width) for y in range(board.height) if defender_zone(x, y)],
+        get_input=lambda _: "",
+        log=game_state.log_message,
+    )
+
+    if defender == "player":
+        player_units = deployment.load_faction_force(player_faction, team_number=1)
+        ai_units = deployment.load_faction_force(ai_faction, team_number=2)
+        deployment.deploy_units(board, player_units, defender_zone, attacker_zone, zone_name, "Player", lambda _: "", game_state.log_message)
+        deployment.deploy_units(board, ai_units, attacker_zone, defender_zone, zone_name, "AI", lambda _: "", game_state.log_message)
+    else:
+        ai_units = deployment.load_faction_force(ai_faction, team_number=1)
+        player_units = deployment.load_faction_force(player_faction, team_number=2)
+        deployment.deploy_units(board, ai_units, defender_zone, attacker_zone, zone_name, "AI", lambda _: "", game_state.log_message)
+        deployment.deploy_units(board, player_units, attacker_zone, defender_zone, zone_name, "Player", lambda _: "", game_state.log_message)
+
+    game_state.players["attacker"] = attacker
+    game_state.players["defender"] = defender
+    game_state.units["player"] = player_units
+    game_state.units["ai"] = ai_units
+
+    if attacker == "player":
+        first_choice = inputs.get("Do you want to go first or second?:", "first")
+        first = "player" if first_choice == "first" else "ai"
+    else:
+        first = random.choice(["ai", "player"])
+        game_state.log_message(f"AI chooses {first} to go first.")
+
+    game_state.phase = "hero"
+    game_state.turn_order = [first, "ai" if first == "player" else "player"]
+    game_state.log_message(f"{first.capitalize()} will take the first turn.")
+    game_state.log_message("Deployment phase complete.")
+
+
 def build_display_grid(game_state, board, preview=None):
     grid_data = game_state.to_grid_dict()
     display_grid = {}
@@ -171,12 +243,19 @@ def game_view():
         input_index += 1
 
         if input_index >= len(input_sequence):
+            if not session.get("deployed"):
+                _apply_deployment(game, session.get("inputs", {}))
+                session["deployed"] = True
             game_state.phase = "hero"
             _save_game(game)
             return redirect("/hero")
 
     # Step 3: Get next prompt
     if input_index >= len(input_sequence):
+        if not session.get("deployed"):
+            _apply_deployment(game, session.get("inputs", {}))
+            session["deployed"] = True
+        _save_game(game)
         return redirect("/hero")
 
 
@@ -204,6 +283,7 @@ def reset_game():
     session.pop("game_data", None)
     global input_index
     input_index = 0
+    session.pop("deployed", None)
     return redirect("/game")
 
 
