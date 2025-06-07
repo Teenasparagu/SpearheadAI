@@ -526,6 +526,8 @@ def unit_placement():
             "positions": [],
         },
     )
+    if "positions" not in state:
+        state["positions"] = state.pop("model_positions", [])
 
     defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
     player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
