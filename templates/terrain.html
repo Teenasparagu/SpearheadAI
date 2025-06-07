@@ -5,10 +5,10 @@
     <title>Terrain Placement</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f2f2f2; }
-        table.grid { border-collapse: collapse; margin: auto; }
-        table.grid td { width: 15px; height: 15px; padding: 0; }
-        table.grid button { width: 15px; height: 15px; padding: 0; border: 1px solid #ccc; font-size: 10px; font-weight: bold; }
-        .messages { max-width: 800px; margin: 20px auto; padding: 10px; background: #fff; border: 1px solid #ccc; font-size: 14px; }
+        .layout { display: flex; justify-content: center; align-items: flex-start; gap: 20px; }
+        table.grid { border-collapse: collapse; margin: 0; }
+        table.grid td, table.grid th { width: 15px; height: 15px; padding: 0; border: 1px solid #ccc; font-size: 10px; font-weight: bold; text-align: center; }
+        .messages { max-width: 300px; padding: 10px; background: #fff; border: 1px solid #ccc; font-size: 14px; overflow-y: auto; height: 500px; }
  codex/implement-terrain-feature-placement
         .zone-info { text-align: center; margin-bottom: 10px; font-weight: bold; }
     </style>
@@ -20,31 +20,42 @@
         <span style="background-color: {{ zone_color }}; padding: 2px 6px; border: 1px solid #555;">{{ zone_name }}</span>
     </div>
 
-    <form method="POST">
-        <table class="grid">
-            {% for y in range(height) %}
-            <tr>
-                {% for x in range(width) %}
-                {% set cell = grid[(x, y)] %}
-                <td>
-                    <button type="submit" name="pos" value="{{x}},{{y}}" style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000', '#888888'] else 'black' }};">
+    <div class="layout">
+        <div class="grid-container">
+            <table class="grid">
+                <tr>
+                    <th></th>
+                    {% for x in range(width) %}
+                    <th>{{ x }}</th>
+                    {% endfor %}
+                </tr>
+                {% for y in range(height) %}
+                <tr>
+                    <th>{{ y }}</th>
+                    {% for x in range(width) %}
+                    {% set cell = grid[(x, y)] %}
+                    <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000', '#888888'] else 'black' }}">
                         {{ cell.label }}
-                    </button>
-                </td>
+                    </td>
+                    {% endfor %}
+                </tr>
                 {% endfor %}
-            </tr>
-            {% endfor %}
-        </table>
-        <br>
-        <button type="submit" name="confirm" value="1">Confirm Placement</button>
-    </form>
-    <div class="messages">
-        <h2>Game Log</h2>
-        <ul>
-            {% for msg in messages %}
-                <li>{{ msg }}</li>
-            {% endfor %}
-        </ul>
+            </table>
+        </div>
+        <div class="messages">
+            <h2>Game Log</h2>
+            <ul>
+                {% for msg in messages %}
+                    <li>{{ msg }}</li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
+
+    <form method="POST" style="text-align:center; margin-top:20px;">
+        <p>Enter "x,y,DIR" to position piece (direction optional), or "confirm" to place.</p>
+        <input type="text" name="input" required>
+        <button type="submit">Submit</button>
+    </form>
 </body>
 </html>

@@ -432,7 +432,8 @@ def terrain_placement():
     player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
 
     if request.method == "POST":
-        if "confirm" in request.form:
+        command = request.form.get("input", "").strip()
+        if command.lower() == "confirm":
             if state.get("pos") is not None:
                 x, y = state["pos"]
                 name, shape = pieces[state["piece_index"]]
@@ -468,14 +469,20 @@ def terrain_placement():
                         return redirect("/game")
                 else:
                     game_state.log_message("Invalid placement.")
-        elif "pos" in request.form:
-            x_str, y_str = request.form.get("pos").split(",")
-            x, y = int(x_str), int(y_str)
-            if state.get("pos") == (x, y):
-                state["dir_idx"] = (state["dir_idx"] + 1) % len(directions)
+        elif command:
+            parts = command.split(",")
+            if len(parts) >= 2:
+                try:
+                    x, y = int(parts[0]), int(parts[1])
+                    state["pos"] = (x, y)
+                    if len(parts) >= 3 and parts[2].upper() in directions:
+                        state["dir_idx"] = directions.index(parts[2].upper())
+                    else:
+                        state["dir_idx"] = 0
+                except ValueError:
+                    game_state.log_message("Invalid coordinates.")
             else:
-                state["pos"] = (x, y)
-                state["dir_idx"] = 0
+                game_state.log_message("Invalid input. Use x,y,DIR or confirm.")
 
     session["terrain_state"] = state
     piece_idx = state["piece_index"]
@@ -493,7 +500,7 @@ def terrain_placement():
         preview = [(x + dx, y + dy) for dx, dy in rotated]
     display_grid = build_display_grid(game_state, board, preview=preview)
 
-    prompt_label = f"Place {pieces[piece_idx][0]} (click to rotate, confirm when done)"
+    prompt_label = f"Place {pieces[piece_idx][0]} - enter x,y,DIR then confirm"
 
     zone_color = "#d0e6ff" if player_zone is defender_zone else "#ffd0d0"
     zone_name = "Blue" if player_zone is defender_zone else "Red"
@@ -552,24 +559,35 @@ def unit_placement():
 
     if request.method == "POST" and current_unit:
         step = state.get("step", "select_pos")
-        if step == "select_pos" and "pos" in request.form:
-            x_str, y_str = request.form.get("pos").split(",")
-            x, y = int(x_str), int(y_str)
-            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
-            valid, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
-            if valid:
-                state["pos"] = (x, y)
-                state["step"] = "choose_form"
+        command = request.form.get("input", "").strip()
+        if step == "select_pos":
+            parts = command.split(",")
+            if len(parts) >= 2:
+                try:
+                    x, y = int(parts[0]), int(parts[1])
+                except ValueError:
+                    game_state.log_message("Invalid coordinates.")
+                    x = y = None
             else:
-                game_state.log_message(f"Invalid placement: {reason}")
-        elif step == "choose_form" and "formation" in request.form:
-            state["formation"] = request.form.get("formation")
-            zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-            enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
-            center_y = sum(y for _, y in zone_coords) / len(zone_coords)
-            orientation = 1 if center_y < board.height / 2 else -1
-            offsets = formation_offsets(state["formation"], len(current_unit.models), orientation)
+                x = y = None
+            if x is not None:
+                zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+                enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+                valid, reason = is_valid_leader_position(x, y, board, zone_coords, enemy_coords)
+                if valid:
+                    state["pos"] = (x, y)
+                    state["step"] = "choose_form"
+                else:
+                    game_state.log_message(f"Invalid placement: {reason}")
+        elif step == "choose_form":
+            form = command.lower()
+            if form in ["box", "triangle", "circle"]:
+                state["formation"] = form
+                zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
+                enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
+                center_y = sum(y for _, y in zone_coords) / len(zone_coords)
+                orientation = 1 if center_y < board.height / 2 else -1
+                offsets = formation_offsets(state["formation"], len(current_unit.models), orientation)
             auto_positions = []
             for i, (dx, dy) in enumerate(offsets):
                 mx, my = state["pos"][0] + dx, state["pos"][1] + dy
@@ -586,7 +604,7 @@ def unit_placement():
                 state["step"] = "select_pos"
                 state["pos"] = None
                 state["formation"] = None
-        elif step == "review" and "confirm" in request.form:
+        elif step == "review" and command.lower() == "confirm":
             zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
             enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
             for i, (mx, my) in enumerate(state.get("auto_positions", [])):
@@ -606,11 +624,11 @@ def unit_placement():
                 }
             else:
                 game_state.log_message(f"Invalid placement: {reason}")
-        elif step == "review" and "manual" in request.form:
+        elif step == "review" and command.lower() == "manual":
             state["manual"] = True
             state["model_positions"] = []
             state["step"] = "manual"
-        elif step == "manual" and "confirm" in request.form:
+        elif step == "manual" and command.lower() == "confirm":
             zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
             enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
             if len(state["model_positions"]) == len(current_unit.models):
@@ -633,12 +651,16 @@ def unit_placement():
                     game_state.log_message(f"Invalid placement: {reason}")
             else:
                 game_state.log_message("Select positions for all models first.")
-        elif step == "manual" and "pos" in request.form:
-            x_str, y_str = request.form.get("pos").split(",")
-            x, y = int(x_str), int(y_str)
-            idx = len(state["model_positions"])
-            if idx < len(current_unit.models):
-                state["model_positions"].append((x, y))
+        elif step == "manual":
+            parts = command.split(",")
+            if len(parts) >= 2:
+                try:
+                    x, y = int(parts[0]), int(parts[1])
+                    idx = len(state["model_positions"])
+                    if idx < len(current_unit.models):
+                        state["model_positions"].append((x, y))
+                except ValueError:
+                    game_state.log_message("Invalid coordinates.")
 
     session["unit_state"] = state
     if state["unit_idx"] >= len(game_state.units["player"]):
@@ -695,74 +717,96 @@ def move_unit_view():
     player_units = game_state.units.get("player", [])
 
     if request.method == "POST":
-        if "finish" in request.form:
+        command = request.form.get("input", "").strip().lower()
+        if command == "finish":
             session.pop("move_state", None)
             game_state.phase = "shooting"
             _save_game(game)
             return redirect("/shoot")
 
         step = state.get("step")
-        if step == "select" and "pos" in request.form:
-            x_str, y_str = request.form.get("pos").split(",")
-            x, y = int(x_str), int(y_str)
-            for idx, u in enumerate(player_units):
-                if any(m.x == x and m.y == y for m in u.models):
-                    state["unit_idx"] = idx
-                    unit = u
-                    if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-                        state["step"] = "combat_choice"
-                    else:
-                        state["step"] = "move_type"
-                    break
+        if step == "select" and command:
+            if "," in command:
+                try:
+                    x_str, y_str = command.split(",")
+                    x, y = int(x_str), int(y_str)
+                except ValueError:
+                    game_state.log_message("Invalid coordinates.")
+                    x = y = None
             else:
-                game_state.log_message("No unit at that position.")
+                x = y = None
+            if x is not None:
+                for idx, u in enumerate(player_units):
+                    if any(m.x == x and m.y == y for m in u.models):
+                        state["unit_idx"] = idx
+                        unit = u
+                        if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
+                            state["step"] = "combat_choice"
+                        else:
+                            state["step"] = "move_type"
+                        break
+                else:
+                    game_state.log_message("No unit at that position.")
 
-        elif step == "combat_choice" and "action" in request.form:
+        elif step == "combat_choice" and command:
             unit = player_units[state["unit_idx"]]
-            if request.form["action"] == "stay":
+            if command == "stay":
                 game_state.log_message(f"{unit.name} stays in combat.")
                 state = {"step": "select"}
-            else:  # retreat
+            elif command == "retreat":
                 state["move_range"] = unit.move_range
                 unit.has_run = True
                 state["step"] = "dest"
+            elif command == "cancel":
+                state = {"step": "select"}
 
-        elif step == "move_type" and "action" in request.form:
+        elif step == "move_type" and command:
             unit = player_units[state["unit_idx"]]
-            if request.form["action"] == "normal":
+            if command == "normal":
                 state["move_range"] = unit.move_range
                 unit.has_run = False
                 state["step"] = "dest"
-            elif request.form["action"] == "run":
+            elif command == "run":
                 run_bonus = random.randint(1, 6)
                 state["move_range"] = unit.move_range + run_bonus * 2
                 unit.has_run = True
                 game_state.log_message(f"{unit.name} runs! Rolled {run_bonus}.")
                 state["step"] = "dest"
-
-        elif step == "dest" and "pos" in request.form:
-            unit = player_units[state["unit_idx"]]
-            x_str, y_str = request.form.get("pos").split(",")
-            x, y = int(x_str), int(y_str)
-            moved = move_unit_to(unit, board, x, y, state.get("move_range", unit.move_range), game_state.log_message)
-            if moved:
+            elif command == "cancel":
                 state = {"step": "select"}
-            else:
-                game_state.log_message("Invalid destination.")
 
-        elif "cancel" in request.form:
-            state = {"step": "select"}
+        elif step == "dest" and command:
+            unit = player_units[state["unit_idx"]]
+            if "," in command:
+                try:
+                    x_str, y_str = command.split(",")
+                    x, y = int(x_str), int(y_str)
+                except ValueError:
+                    game_state.log_message("Invalid coordinates.")
+                    x = y = None
+            elif command == "cancel":
+                state = {"step": "select"}
+                x = y = None
+            else:
+                game_state.log_message("Invalid input.")
+                x = y = None
+            if x is not None:
+                moved = move_unit_to(unit, board, x, y, state.get("move_range", unit.move_range), game_state.log_message)
+                if moved:
+                    state = {"step": "select"}
+                else:
+                    game_state.log_message("Invalid destination.")
 
     session["move_state"] = state
     step = state.get("step")
     if step == "select":
-        prompt_label = "Select a unit (click on the grid) or Finish"
+        prompt_label = "Enter unit coordinates x,y or 'finish'"
     elif step == "combat_choice":
-        prompt_label = "Unit in combat: Stay or Retreat?"
+        prompt_label = "Unit in combat: stay/retreat or 'cancel'"
     elif step == "move_type":
-        prompt_label = "Choose Move or Run"
+        prompt_label = "Choose normal/run or 'cancel'"
     else:  # dest
-        prompt_label = "Select destination"
+        prompt_label = "Enter destination x,y or 'cancel'"
 
     display_grid = build_display_grid(game_state, board)
     response = render_template(

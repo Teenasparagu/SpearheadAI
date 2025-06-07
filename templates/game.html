@@ -12,11 +12,17 @@
         h1 {
             text-align: center;
         }
+        .layout {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+        }
         table.grid {
             border-collapse: collapse;
-            margin: auto;
+            margin: 0;
         }
-        table.grid td {
+        table.grid td, table.grid th {
             width: 15px;
             height: 15px;
             text-align: center;
@@ -27,12 +33,13 @@
             padding: 0;
         }
         .messages {
-            max-width: 800px;
-            margin: 20px auto;
+            max-width: 300px;
             padding: 10px;
             background: #fff;
             border: 1px solid #ccc;
             font-size: 14px;
+            overflow-y: auto;
+            height: 500px;
         }
         .input-form {
             text-align: center;
@@ -60,41 +67,51 @@
 
     <h1>Spearhead AI – Game Board</h1>
 
-    <table class="grid">
-        {% for y in range(height) %}
-        <tr>
-            {% for x in range(width) %}
-            {% set cell = grid[(x, y)] %}
-            <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000'] else 'black' }}">
-                {{ cell.label }}
-            </td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </table>
+    <div class="layout">
+        <div class="grid-container">
+            <table class="grid">
+                <tr>
+                    <th></th>
+                    {% for x in range(width) %}
+                    <th>{{ x }}</th>
+                    {% endfor %}
+                </tr>
+                {% for y in range(height) %}
+                <tr>
+                    <th>{{ y }}</th>
+                    {% for x in range(width) %}
+                    {% set cell = grid[(x, y)] %}
+                    <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000', '#888888'] else 'black' }}">
+                        {{ cell.label }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="messages">
+            <h2>Game Log</h2>
+            <ul>
+                {% for msg in messages %}
+                    <li>{{ msg }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
 
     <div class="input-form">
         <form method="POST">
             <label><strong>{{ prompt_label }}</strong></label><br><br>
             {% if choices %}
+            <p>
                 {% for c in choices %}
-                    <button type="submit" name="input" value="{{ c.value }}">{{ c.label }}</button>
+                    {{ c.value }} = {{ c.label }}{% if not loop.last %}, {% endif %}
                 {% endfor %}
-            {% else %}
-                <input type="text" name="input" required>
-                <button type="submit">Submit</button>
+            </p>
             {% endif %}
+            <input type="text" name="input" required>
+            <button type="submit">Submit</button>
         </form>
     </div>
-
-    <div class="messages">
-        <h2>Game Log</h2>
-        <ul>
-            {% for msg in messages %}
-                <li>{{ msg }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-
 </body>
 </html>
