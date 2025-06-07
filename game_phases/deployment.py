@@ -375,4 +375,29 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
                 if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
                     return False, "too close to enemy terrain"
 
+
+    return True, None
+
+
+def is_valid_model_position(x, y, model, board, zone, enemy_zone, other_positions):
+    """Validate a single model position relative to already placed models."""
+    zone_set = set(zone)
+    enemy_set = set(enemy_zone)
+
+    for px, py in Model(x, y, base_diameter=model.base_diameter).get_occupied_squares():
+        if not (0 <= px < board.width and 0 <= py < board.height):
+            return False, "out of bounds"
+        if (px, py) not in zone_set:
+            return False, "outside deployment zone"
+        if board.grid[py][px] != TILE_EMPTY:
+            return False, "space occupied"
+        for tx, ty in board.terrain:
+            if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
+                return False, "too close to enemy terrain"
+
+    for ox, oy in other_positions:
+        if math.hypot(x - ox, y - oy) > 2:
+            return False, "too far from unit"
+
+
     return True, None

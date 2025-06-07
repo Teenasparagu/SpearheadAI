@@ -524,10 +524,16 @@ def unit_placement():
         {
             "unit_idx": 0,
             "positions": [],
+
+            "pending": None,
+
         },
     )
     if "positions" not in state:
         state["positions"] = state.pop("model_positions", [])
+
+    state.setdefault("pending", None)
+
 
     defender_zone, attacker_zone = get_deployment_zones(board, game_state.map_layout or "straight")
     player_zone = defender_zone if game_state.players.get("defender") == "player" else attacker_zone
@@ -552,23 +558,62 @@ def unit_placement():
         if "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
-            if len(state["positions"]) < len(current_unit.models):
-                state["positions"].append((x, y))
+
+            state["pending"] = (x, y)
         elif "confirm" in request.form:
-            if len(state["positions"]) == len(current_unit.models):
-                zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
-                enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone(i, j)]
-                for i, (mx, my) in enumerate(state["positions"]):
-                    current_unit.models[i].x = mx
-                    current_unit.models[i].y = my
-                current_unit.x, current_unit.y = state["positions"][0]
-                valid, reason = deployment.is_valid_unit_placement(current_unit.x, current_unit.y, current_unit, board, zone_coords, enemy_coords)
-                if valid and board.place_unit(current_unit):
-                    game_state.log_message(f"Placed {current_unit.name}")
-                    state = {"unit_idx": state["unit_idx"] + 1, "positions": []}
+            if state.get("pending") is not None:
+                idx = len(state["positions"])
+                zone_coords = [
+                    (i, j)
+                    for i in range(board.width)
+                    for j in range(board.height)
+                    if player_zone(i, j)
+                ]
+                enemy_coords = [
+                    (i, j)
+                    for i in range(board.width)
+                    for j in range(board.height)
+                    if enemy_zone(i, j)
+                ]
+                other = state["positions"]
+                model = current_unit.models[idx]
+                mx, my = state["pending"]
+                valid, reason = deployment.is_valid_model_position(
+                    mx,
+                    my,
+                    model,
+                    board,
+                    zone_coords,
+                    enemy_coords,
+                    other,
+                )
+                if valid:
+                    state["positions"].append((mx, my))
+                    state["pending"] = None
+                    if len(state["positions"]) == len(current_unit.models):
+                        for i, (px, py) in enumerate(state["positions"]):
+                            current_unit.models[i].x = px
+                            current_unit.models[i].y = py
+                        current_unit.x, current_unit.y = state["positions"][0]
+                        valid_unit, reason = deployment.is_valid_unit_placement(
+                            current_unit.x,
+                            current_unit.y,
+                            current_unit,
+                            board,
+                            zone_coords,
+                            enemy_coords,
+                        )
+                        if valid_unit and board.place_unit(current_unit):
+                            game_state.log_message(f"Placed {current_unit.name}")
+                            state = {"unit_idx": state["unit_idx"] + 1, "positions": [], "pending": None}
+                        else:
+                            game_state.log_message(f"Invalid placement: {reason}")
+                            state["positions"] = []
+                            state["pending"] = None
                 else:
-                    game_state.log_message(f"Invalid placement: {reason}")
-                    state["positions"] = []
+                    game_state.log_message(f"Invalid position: {reason}")
+                    state["pending"] = None
+
 
     session["unit_state"] = state
     if state["unit_idx"] >= len(game_state.units["player"]):
@@ -584,6 +629,14 @@ def unit_placement():
             preview.extend(
                 Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares()
             )
+
+        if state.get("pending") is not None and len(state["positions"]) < len(current_unit.models):
+            idx = len(state["positions"])
+            mx, my = state["pending"]
+            preview.extend(
+                Model(mx, my, base_diameter=current_unit.models[idx].base_diameter).get_occupied_squares()
+            )
+
 
     display_grid = build_display_grid(game_state, board, preview=preview)
 
@@ -601,7 +654,16 @@ def unit_placement():
         messages=game_state.messages,
         zone_color=zone_color,
         zone_name=zone_name,
-        models_remaining=len(current_unit.models) - len(state.get("positions", [])) if current_unit else 0,
+
+        models_remaining=(
+            len(current_unit.models)
+            - len(state.get("positions", []))
+            - (1 if state.get("pending") is not None else 0)
+        )
+        if current_unit
+        else 0,
+        pending=state.get("pending") is not None,
+
     )
     _save_game(game)
     return response
