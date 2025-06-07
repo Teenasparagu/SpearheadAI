@@ -34,17 +34,11 @@
             {% endfor %}
         </table>
         <br>
-        {% if step == 'choose_form' %}
-            <button type="submit" name="formation" value="box">Box</button>
-            <button type="submit" name="formation" value="triangle">Triangle</button>
-            <button type="submit" name="formation" value="circle">Circle</button>
-        {% elif step == 'review' %}
-            <button type="submit" name="confirm" value="1">Confirm Placement</button>
-            {% if not manual %}
-            <button type="submit" name="manual" value="1">Manual Placement</button>
-            {% endif %}
-        {% elif step == 'manual' %}
-            <button type="submit" name="confirm" value="1">Confirm Placement</button>
+        <div style="text-align:center; margin-bottom:10px;">
+            Models remaining: {{ models_remaining }}
+        </div>
+        {% if pending %}
+        <button type="submit" name="confirm" value="1">Confirm Position</button>
         {% endif %}
     </form>
     <div class="messages">
