@@ -1,11 +1,11 @@
 try:
     from flask import Flask, render_template, request, redirect, session
+    from flask_session import Session
 except ModuleNotFoundError as exc:
     raise RuntimeError(
         "Flask is required to run the web interface. Install dependencies via 'pip install -r requirements.txt'."
     ) from exc
-import base64
-import pickle
+import uuid
 import random
 import math
 from game_logic.game_engine import GameEngine
@@ -34,20 +34,31 @@ def _circle_offsets(num, orientation):
 
 app = Flask(__name__)
 app.secret_key = "supersecret"  # Required for Flask session
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
+
+# In-memory store for active games
+game_store = {}
 
 
 def _load_game() -> GameEngine:
-    """Load the GameEngine instance from the session or create a new one."""
-    if "game_data" not in session:
+    """Load the GameEngine instance using a session-stored game ID."""
+    game_id = session.get("game_id")
+    if not game_id or game_id not in game_store:
         game = GameEngine()
-        session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
-        return game
-    return pickle.loads(base64.b64decode(session["game_data"]))
+        game_id = str(uuid.uuid4())
+        session["game_id"] = game_id
+        game_store[game_id] = game
+    else:
+        game = game_store[game_id]
+    return game
 
 
 def _save_game(game: GameEngine) -> None:
-    """Persist the GameEngine instance back into the session."""
-    session["game_data"] = base64.b64encode(pickle.dumps(game)).decode("utf-8")
+    """Persist the GameEngine instance back into the server-side store."""
+    game_id = session.get("game_id")
+    if game_id:
+        game_store[game_id] = game
 
 
 def _apply_deployment(game: GameEngine, inputs: dict) -> None:
@@ -279,11 +290,12 @@ def game_view():
 
 @app.route("/reset")
 def reset_game():
+    game_id = session.get("game_id")
+    if game_id and game_id in game_store:
+        game_store.pop(game_id)
     session.clear()
-    session.pop("game_data", None)
     global input_index
     input_index = 0
-    session.pop("deployed", None)
     return redirect("/game")
 
 
