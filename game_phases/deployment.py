@@ -339,6 +339,19 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
             if math.hypot(x - tx, y - ty) < 12:
                 return False, "too close to enemy terrain"
 
+    if len(unit.models) > 1:
+        for i, model in enumerate(unit.models):
+            coherent = False
+            for j, other in enumerate(unit.models):
+                if i == j:
+                    continue
+                if math.hypot(model.x - other.x, model.y - other.y) <= 2:
+                    coherent = True
+                    break
+            if not coherent:
+                return False, "unit incoherent"
+
+
     return True, None
 
 
@@ -375,6 +388,19 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
                 if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
                     return False, "too close to enemy terrain"
 
+    if len(unit.models) > 1:
+        for i, model in enumerate(unit.models):
+            coherent = False
+            for j, other in enumerate(unit.models):
+                if i == j:
+                    continue
+                if math.hypot(model.x - other.x, model.y - other.y) <= 2:
+                    coherent = True
+                    break
+            if not coherent:
+                return False, "unit incoherent"
+
+
 
     return True, None
 
@@ -394,10 +420,14 @@ def is_valid_model_position(x, y, model, board, zone, enemy_zone, other_position
         for tx, ty in board.terrain:
             if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
                 return False, "too close to enemy terrain"
-
+    if not other_positions:
+        return True, None
+    close_to_any = False
     for ox, oy in other_positions:
-        if math.hypot(x - ox, y - oy) > 2:
-            return False, "too far from unit"
+        if math.hypot(x - ox, y - oy) <= 2:
+            close_to_any = True
+            break
 
-
+    if not close_to_any:
+        return False, "too far from unit"
     return True, None
