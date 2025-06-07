@@ -52,12 +52,19 @@ class Board:
         return True
 
     def place_unit(self, unit: Unit):
-        """Place unit without validation for debugging."""
-        self.units.append(unit)
+        """Place a unit on the board with basic validation."""
+        pending_tiles = []
         for model in unit.models:
             for x, y in model.get_occupied_squares():
-                if 0 <= x < self.width and 0 <= y < self.height:
-                    self.grid[y][x] = TILE_UNIT
+                if not (0 <= x < self.width and 0 <= y < self.height):
+                    return False
+                if self.grid[y][x] != TILE_EMPTY:
+                    return False
+                pending_tiles.append((x, y))
+
+        for x, y in pending_tiles:
+            self.grid[y][x] = TILE_UNIT
+        self.units.append(unit)
         print(f"{unit.name} placed successfully.")
         return True
 
