@@ -173,15 +173,6 @@ class Board:
             if self.grid[y][x] != TILE_EMPTY and (x, y) not in unit_squares:
                 return False
 
-        coherent = False
-        for i, other in enumerate(unit.models):
-            if i == model_idx:
-                continue
-            if math.sqrt((dest_x - other.x) ** 2 + (dest_y - other.y) ** 2) <= 2:
-                coherent = True
-                break
-        if not coherent and len(unit.models) > 1:
-            return False
 
         for x, y in current_squares:
             self.grid[y][x] = TILE_EMPTY

@@ -375,7 +375,6 @@ def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
                 if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
                     return False, "too close to enemy terrain"
 
-
     return True, None
 
 
@@ -394,10 +393,4 @@ def is_valid_model_position(x, y, model, board, zone, enemy_zone, other_position
         for tx, ty in board.terrain:
             if (tx, ty) in enemy_set and math.hypot(px - tx, py - ty) < 12:
                 return False, "too close to enemy terrain"
-
-    for ox, oy in other_positions:
-        if math.hypot(x - ox, y - oy) > 2:
-            return False, "too far from unit"
-
-
     return True, None
