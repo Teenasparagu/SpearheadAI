@@ -194,19 +194,27 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
         if team == 2:
             log(f"AI is placing {name}...")
             attempts = 100
+            last_reason = None
             directions = list(rotate_shape.__globals__["DIRECTION_VECTORS"].keys())
             for _ in range(attempts):
                 x, y = random.choice(zone)
                 direction = random.choice(directions)
                 rotated = rotate_shape(base_shape, direction)
-                legal, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
+                legal, reason = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
 
                 if legal:
                     if board.place_terrain_piece(x, y, rotated):
                         log(f"✅ AI placed {name} at ({x}, {y}) facing {direction}")
                         break
+                    else:
+                        last_reason = "board placement rejected"
+                else:
+                    last_reason = f"invalid at {reason}"
             else:
-                log(f"❌ AI failed to place {name} after 100 attempts.")
+                msg = f"❌ AI failed to place {name} after 100 attempts."
+                if last_reason:
+                    msg += f" Last error: {last_reason}."
+                log(msg)
         else:
             while True:
                 user_input = get_input(f"Place {name} - Enter 'x y direction' or 'skip':").strip().lower()
@@ -220,7 +228,7 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
                     x, y = int(parts[0]), int(parts[1])
                     direction = parts[2]
                     rotated = rotate_shape(base_shape, direction)
-                    valid, _ = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
+                    valid, reason = is_valid_terrain_placement(x, y, rotated, board, zone, enemy_zone)
                     if valid:
                         if board.place_terrain_piece(x, y, rotated):
                             log(f"✅ Placed {name} at ({x},{y}) facing {direction}")
@@ -228,7 +236,7 @@ def deploy_terrain(board, team, zone, enemy_zone, get_input, log):
                         else:
                             log("❌ Unexpected error: placement failed despite passing checks.")
                     else:
-                        log("❌ Placement invalid.")
+                        log(f"❌ Placement invalid: {reason}")
                 except Exception as e:
                     log(f"⚠️ Error: {e}")
 
@@ -243,6 +251,7 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
         if player_label.lower() == "ai":
             placed = False
             attempts = 100
+            last_reason = None
             while not placed and attempts > 0:
                 x = random.randint(0, board.width - 1)
                 y = random.randint(0, board.height - 1)
@@ -252,12 +261,17 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                         unit.models[i].x = x + dx
                         unit.models[i].y = y + dy
                     unit.x, unit.y = x, y
-                    valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
+                    valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
                     if valid and board.place_unit(unit):
                         placed = True
+                    else:
+                        last_reason = reason if not valid else "board placement rejected"
                 attempts -= 1
             if not placed:
-                log(f"⚠ AI could not place {unit.name} after 100 attempts.")
+                msg = f"⚠ AI could not place {unit.name} after 100 attempts."
+                if last_reason:
+                    msg += f" Last error: {last_reason}."
+                log(msg)
         else:
             while True:
                 try:
@@ -338,19 +352,6 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
         if (tx, ty) in enemy_set:
             if math.hypot(x - tx, y - ty) < 12:
                 return False, "too close to enemy terrain"
-
-    if len(unit.models) > 1:
-        for i, model in enumerate(unit.models):
-            coherent = False
-            for j, other in enumerate(unit.models):
-                if i == j:
-                    continue
-                if math.hypot(model.x - other.x, model.y - other.y) <= 2:
-                    coherent = True
-                    break
-            if not coherent:
-                return False, "unit incoherent"
-
 
     return True, None
 
