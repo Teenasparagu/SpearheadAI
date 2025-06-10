@@ -284,41 +284,46 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                     if not ok:
                         log(f"❌ Placement invalid: {reason}")
                         continue
-                    formation = get_input("Choose formation (box/triangle/circle):").strip().lower()
-                    offsets = formation_offsets(formation, len(unit.models), orientation)
-                    for i, (dx, dy) in enumerate(offsets):
-                        unit.models[i].x = x + dx
-                        unit.models[i].y = y + dy
+
+                    # Set leader position without further prompts
+                    unit.models[0].x = x
+                    unit.models[0].y = y
                     unit.x, unit.y = x, y
+                    log(f"Leader placed at ({x}, {y}). Placing remaining models...")
+
+                    placed_positions = [(x, y)]
+                    for idx in range(1, len(unit.models)):
+                        radius = 1
+                        placed_model = False
+                        while not placed_model and radius < max(board.width, board.height):
+                            spiral = generate_spiral_offsets(radius)
+                            for dx, dy in spiral[1:]:
+                                mx, my = x + dx, y + dy
+                                valid, _ = is_valid_model_position(
+                                    mx,
+                                    my,
+                                    unit.models[idx],
+                                    board,
+                                    zone_coords,
+                                    enemy_coords,
+                                    placed_positions,
+                                )
+                                if valid:
+                                    unit.models[idx].x = mx
+                                    unit.models[idx].y = my
+                                    placed_positions.append((mx, my))
+                                    placed_model = True
+                                    break
+                            radius += 1
+                        if not placed_model:
+                            log(f"⚠️ Could not find placement for model {idx} of {unit.name}.")
+
                     valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
-                    if not valid:
-                        log(f"❌ Placement invalid: {reason}")
-                        continue
-                    log("Proposed positions:")
-                    for i, m in enumerate(unit.models):
-                        log(f"  Model {i} -> ({m.x}, {m.y})")
-                    confirm = get_input("Confirm placement? (y/n):").strip().lower()
-                    if confirm.startswith("y"):
-                        board.place_unit(unit)
-                        log(f"Placed {unit.name}")
-                        break
-                    manual = get_input("Manual placement instead? (y/n):").strip().lower()
-                    if not manual.startswith("y"):
-                        continue
-                    positions = []
-                    for idx in range(len(unit.models)):
-                        mx, my = map(int, get_input(f"Model {idx} x y:").split())
-                        positions.append((mx, my))
-                    for idx, (mx, my) in enumerate(positions):
-                        unit.models[idx].x = mx
-                        unit.models[idx].y = my
-                    unit.x, unit.y = positions[0]
-                    valid, reason = is_valid_unit_placement(unit.x, unit.y, unit, board, zone_coords, enemy_coords)
                     if valid and board.place_unit(unit):
                         log(f"Placed {unit.name}")
                         break
                     else:
-                        log(f"❌ Manual placement invalid: {reason}")
+                        log(f"❌ Placement invalid: {reason}")
                 except ValueError:
                     log("Invalid input. Use format: x y (e.g., 12 8)")
 
