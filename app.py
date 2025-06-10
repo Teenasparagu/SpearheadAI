@@ -441,7 +441,7 @@ def terrain_placement():
                 zone_coords = [(i, j) for i in range(board.width) for j in range(board.height) if player_zone(i, j)]
                 enemy_zone_func = attacker_zone if player_zone is defender_zone else defender_zone
                 enemy_coords = [(i, j) for i in range(board.width) for j in range(board.height) if enemy_zone_func(i, j)]
-                legal, _ = deployment.is_valid_terrain_placement(x, y, rotated, board, zone_coords, enemy_coords)
+                legal, reason = deployment.is_valid_terrain_placement(x, y, rotated, board, zone_coords, enemy_coords)
                 if legal and board.place_terrain_piece(x, y, rotated):
 
                     game_state.log_message(f"Placed {name} at ({x},{y}) facing {direction}")
@@ -467,7 +467,12 @@ def terrain_placement():
                         _save_game(game)
                         return redirect("/game")
                 else:
-                    game_state.log_message("Invalid placement.")
+                    msg = "Invalid placement"
+                    if not legal:
+                        msg += f": {reason}"
+                    else:
+                        msg += ": board rejected placement"
+                    game_state.log_message(msg)
         elif "pos" in request.form:
             x_str, y_str = request.form.get("pos").split(",")
             x, y = int(x_str), int(y_str)
