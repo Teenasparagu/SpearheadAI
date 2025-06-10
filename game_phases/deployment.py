@@ -353,19 +353,6 @@ def is_valid_leader_position(x, y, board, zone, enemy_zone):
             if math.hypot(x - tx, y - ty) < 12:
                 return False, "too close to enemy terrain"
 
-    if len(unit.models) > 1:
-        for i, model in enumerate(unit.models):
-            coherent = False
-            for j, other in enumerate(unit.models):
-                if i == j:
-                    continue
-                if math.hypot(model.x - other.x, model.y - other.y) <= 2:
-                    coherent = True
-                    break
-            if not coherent:
-                return False, "unit incoherent"
-
-
     return True, None
 
 
