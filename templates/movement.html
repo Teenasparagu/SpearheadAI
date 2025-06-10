@@ -6,8 +6,7 @@
     <style>
         body { font-family: Arial, sans-serif; background-color: #f2f2f2; margin: 20px; }
         table.grid { border-collapse: collapse; margin: auto; }
-        table.grid td { width: 15px; height: 15px; padding: 0; }
-        table.grid button { width: 15px; height: 15px; padding: 0; border: 1px solid #ccc; font-size: 10px; font-weight: bold; }
+        table.grid td, table.grid th { width: 15px; height: 15px; padding: 0; border: 1px solid #ccc; font-size: 10px; font-weight: bold; }
         .messages { max-width: 800px; margin: 20px auto; padding: 10px; background: #fff; border: 1px solid #ccc; font-size: 14px; }
     </style>
 </head>
@@ -15,33 +14,27 @@
     <h1 style="text-align:center;">{{ prompt_label }}</h1>
     <form method="POST">
         <table class="grid">
+            <tr>
+                <th></th>
+                {% for x in range(width) %}
+                    <th class="coord">{{ x }}</th>
+                {% endfor %}
+            </tr>
             {% for y in range(height) %}
             <tr>
+                <th class="coord">{{ y }}</th>
                 {% for x in range(width) %}
                 {% set cell = grid[(x, y)] %}
-                <td>
-                    <button type="submit" name="pos" value="{{x}},{{y}}" style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000', '#888888'] else 'black' }};">
-                        {{ cell.label }}
-                    </button>
+                <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000', '#888888'] else 'black' }}">
+                    {{ cell.label }}
                 </td>
                 {% endfor %}
             </tr>
             {% endfor %}
         </table>
         <br>
-        {% if step == 'select' %}
-            <button type="submit" name="finish" value="1">Finish Movement Phase</button>
-        {% elif step == 'combat_choice' %}
-            <button type="submit" name="action" value="stay">Stay</button>
-            <button type="submit" name="action" value="retreat">Retreat</button>
-            <button type="submit" name="cancel" value="1">Cancel</button>
-        {% elif step == 'move_type' %}
-            <button type="submit" name="action" value="normal">Move</button>
-            <button type="submit" name="action" value="run">Run</button>
-            <button type="submit" name="cancel" value="1">Cancel</button>
-        {% elif step == 'dest' %}
-            <button type="submit" name="cancel" value="1">Cancel</button>
-        {% endif %}
+        <input type="text" name="input" style="width:200px;">
+        <button type="submit">Submit</button>
     </form>
     <div class="messages">
         <h2>Game Log</h2>
