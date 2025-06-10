@@ -606,6 +606,9 @@ def unit_placement():
                     "manual": False,
                     "model_positions": [],
                 }
+                session["unit_state"] = state
+                _save_game(game)
+                return redirect("/units")
             else:
                 game_state.log_message(f"Invalid placement: {reason}")
         elif step == "review" and command.lower() == "manual":
@@ -631,6 +634,9 @@ def unit_placement():
                         "manual": False,
                         "model_positions": [],
                     }
+                    session["unit_state"] = state
+                    _save_game(game)
+                    return redirect("/units")
                 else:
                     game_state.log_message(f"Invalid placement: {reason}")
             else:
