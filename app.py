@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect
+from flask import Flask, render_template
 from game_logic.game_engine import GameEngine
 from game_phases.deployment import get_deployment_zones, formation_offsets
 import math
@@ -82,13 +82,6 @@ def show_board():
         messages=engine.game_state.messages,
     )
 
-
-@app.route("/reset")
-def reset_game():
-    """Reset the shared engine and redirect to the board."""
-    global engine
-    engine = GameEngine()
-    return redirect("/")
 
 
 if __name__ == "__main__":

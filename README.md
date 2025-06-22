@@ -1,21 +1,32 @@
 # SpearheadAI
 
 This project provides a basic game engine. A lightweight Flask application is
-included that displays the current board state while the game runs from a
-command line program.
 
-## Launching the Game & Viewer
+included that only displays the current board state while the game itself is run
+from a separate command line program.
+
+## Launching the Board Viewer
+
 
 1. Install dependencies (Flask, numpy, and pytest are used):
    ```bash
    pip install -r requirements.txt
    ```
-2. Start the game (which also launches the viewer):
+
+2. Start the viewer in one terminal:
+
    ```bash
    python run_game.py
    ```
-   Then open `http://localhost:5000/` in your browser to watch the board as you
-   interact with the CLI.
+
+   Then open `http://localhost:5000/` in your browser to see the board.
+3. In another terminal run the CLI game:
+   ```bash
+   python run_game.py
+   ```
+   The CLI prompts for input while the web page updates to reflect the board
+   state.
+
 
 ## Programmatic Usage
 
