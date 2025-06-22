@@ -56,8 +56,9 @@ class GameState:
                 elif team == 2:
                     grid[(obj.x, obj.y)]["control2"] = 1
 
-        # Mark units and stats
-        for unit in self.units["player"] + self.units["ai"]:
+        # Mark units and stats using the board as the source of truth
+        # so placements are reflected immediately.
+        for unit in self.board.units:
             for i, model in enumerate(unit.models):
                 if 0 <= model.x < self.width and 0 <= model.y < self.height:
                     tile = grid[(model.x, model.y)]
