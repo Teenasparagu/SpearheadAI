@@ -13,19 +13,13 @@ from a separate command line program.
    pip install -r requirements.txt
    ```
 
-2. Start the viewer in one terminal:
+2. Run the game (this also launches the board viewer):
 
    ```bash
    python run_game.py
    ```
 
-   Then open `http://localhost:5000/` in your browser to see the board.
-3. In another terminal run the CLI game:
-   ```bash
-   python run_game.py
-   ```
-   The CLI prompts for input while the web page updates to reflect the board
-   state.
+   Open `http://localhost:5000/` in your browser to see the board as you play.
 
 
 ## Programmatic Usage
