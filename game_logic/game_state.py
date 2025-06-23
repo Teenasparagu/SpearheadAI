@@ -37,6 +37,7 @@ class GameState:
                     "team2": 0,
                     "leader1": 0,
                     "leader2": 0,
+                    "center": 0,
                     "move_range": 0,
                     "control_score": 0
                 }
@@ -60,18 +61,21 @@ class GameState:
         # so placements are reflected immediately.
         for unit in self.board.units:
             for i, model in enumerate(unit.models):
-                occupied = model.get_occupied_squares()
+                occupied = model.get_display_squares()
+                center = model.get_central_square()
                 for ox, oy in occupied:
                     if 0 <= ox < self.width and 0 <= oy < self.height:
                         tile = grid[(ox, oy)]
                         if unit.team == 1:
                             tile["team1"] = 1
-                            if i == 0 and (ox, oy) == (model.x, model.y):
+                            if i == 0:
                                 tile["leader1"] = 1
                         else:
                             tile["team2"] = 1
-                            if i == 0 and (ox, oy) == (model.x, model.y):
+                            if i == 0:
                                 tile["leader2"] = 1
+                        if (ox, oy) == center:
+                            tile["center"] = 1
                         tile["move_range"] = unit.move_range / 12  # Normalize max 12"
                         tile["control_score"] = unit.control_score / 5  # Assume max 5
 
@@ -79,7 +83,19 @@ class GameState:
 
     def to_tensor(self):
         grid_dict = self.to_grid_dict()
-        channel_keys = ["terrain", "objective", "control1", "control2", "team1", "team2", "leader1", "leader2", "move_range", "control_score"]
+        channel_keys = [
+            "terrain",
+            "objective",
+            "control1",
+            "control2",
+            "team1",
+            "team2",
+            "leader1",
+            "leader2",
+            "center",
+            "move_range",
+            "control_score",
+        ]
         tensor = np.zeros((len(channel_keys), self.height, self.width), dtype=np.float32)
 
         for (x, y), features in grid_dict.items():

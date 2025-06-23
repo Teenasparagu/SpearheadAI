@@ -43,6 +43,38 @@ class Model:
                 occupied.append((self.x + dx, self.y + dy))
         return occupied
 
+    def get_display_squares(self):
+        """Return squares representing a circular or elliptical base."""
+        occupied = []
+        width_tiles = int(round(self.base_width / 0.5))
+        height_tiles = int(round(self.base_height / 0.5))
+
+        cx = width_tiles / 2.0
+        cy = height_tiles / 2.0
+        rx = width_tiles / 2.0
+        ry = height_tiles / 2.0
+
+        for dx in range(width_tiles):
+            for dy in range(height_tiles):
+                px = dx + 0.5
+                py = dy + 0.5
+                if ((px - cx) ** 2) / (rx ** 2) + ((py - cy) ** 2) / (ry ** 2) <= 1:
+                    occupied.append((self.x + dx, self.y + dy))
+        return occupied
+
+    def get_central_square(self):
+        """Return the central board square for this model."""
+        width_tiles = int(round(self.base_width / 0.5))
+        height_tiles = int(round(self.base_height / 0.5))
+
+        cx = width_tiles // 2
+        cy = height_tiles // 2
+        if width_tiles % 2 == 0:
+            cx -= 1
+        if height_tiles % 2 == 0:
+            cy -= 1
+        return (self.x + cx, self.y + cy)
+
     def __repr__(self):
         return (
             f"Model({self.x}, {self.y}, base_width={self.base_width}, "
