@@ -54,16 +54,16 @@ def build_display_grid(game_state, board):
                 label = "T"
             if tile["leader1"]:
                 color = "#0044cc"
-                label = "L"
+                label = "L" if tile["center"] else "l"
             elif tile["team1"]:
                 color = "#3399ff"
-                label = "U"
+                label = "U" if tile["center"] else "u"
             elif tile["leader2"]:
                 color = "#cc0000"
-                label = "L"
+                label = "L" if tile["center"] else "l"
             elif tile["team2"]:
                 color = "#ff6666"
-                label = "U"
+                label = "U" if tile["center"] else "u"
 
             display_grid[(x, y)] = {"color": color, "label": label}
 
