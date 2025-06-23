@@ -95,67 +95,79 @@ def choose_deployment_map(get_input, log):
             log("Invalid choice.")
 
 
-def _triangle_offsets(num, orientation):
+def _triangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     """Offsets for a triangle formation behind the leader."""
     offsets = [(0, 0)]
     placed = 1
     row = 2
-    y = -orientation
+    x_step = int(round(base_width / 0.5))
+    y_step = int(round(base_height / 0.5))
+    y = -orientation * y_step
     while placed < num:
-        start_x = -(row - 1)
+        start_x = -(row - 1) * x_step
         for i in range(row):
             if placed >= num:
                 break
-            offsets.append((start_x + 2 * i, y))
+            offsets.append((start_x + 2 * x_step * i, y))
             placed += 1
         row += 1
-        y -= orientation
+        y -= orientation * y_step
     return offsets
 
 
-def _rectangle_offsets(num, orientation):
+def _rectangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     """Offsets for a simple rectangular block behind the leader."""
     offsets = [(0, 0)]
     cols = math.ceil(math.sqrt(num))
     rows = math.ceil(num / cols)
+    x_step = int(round(base_width / 0.5))
+    y_step = int(round(base_height / 0.5))
     placed = 1
     for r in range(rows):
         if placed >= num:
             break
-        y = -(r + 1) * orientation
-        start_x = -(cols - 1)
+        y = -(r + 1) * orientation * y_step
+        start_x = -(cols - 1) * x_step
         for c in range(cols):
             if placed >= num:
                 break
-            offsets.append((start_x + 2 * c, y))
+            offsets.append((start_x + 2 * x_step * c, y))
             placed += 1
     return offsets
 
 
-def _circle_offsets(num, orientation):
+def _circle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     """Offsets spreading models in a semicircle behind the leader."""
     offsets = [(0, 0)]
     spiral = generate_spiral_offsets(radius=6)
+    x_step = int(round(base_width / 0.5))
+    y_step = int(round(base_height / 0.5))
     for dx, dy in spiral[1:]:
         if len(offsets) >= num:
             break
         if -orientation * dy >= 0:
-            offsets.append((dx, dy))
+            offsets.append((dx * x_step, dy * y_step))
     for dx, dy in spiral[1:]:
         if len(offsets) >= num:
             break
         if -orientation * dy < 0:
-            offsets.append((dx, dy))
+            offsets.append((dx * x_step, dy * y_step))
     return offsets[:num]
 
 
-def formation_offsets(formation, num_models, orientation):
+def formation_offsets(
+    formation,
+    num_models,
+    orientation,
+    base_width=1.0,
+    base_height=1.0,
+):
     formation = (formation or "triangle").lower()
     if formation.startswith("box") or formation.startswith("rect"):
-        return _rectangle_offsets(num_models, orientation)
+        return _rectangle_offsets(num_models, orientation, base_width, base_height)
     if formation.startswith("circle"):
-        return _circle_offsets(num_models, orientation)
-    return _triangle_offsets(num_models, orientation)
+        return _circle_offsets(num_models, orientation, base_width, base_height)
+    return _triangle_offsets(num_models, orientation, base_width, base_height)
 
 def get_deployment_zones(board, map_type):
     if map_type == "straight":
@@ -244,7 +256,13 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                 x = random.randint(0, board.width - 1)
                 y = random.randint(0, board.height - 1)
                 if territory_bounds(x, y):
-                    offsets = formation_offsets("box", len(unit.models), orientation)
+                    offsets = formation_offsets(
+                        "box",
+                        len(unit.models),
+                        orientation,
+                        unit.base_width,
+                        unit.base_height,
+                    )
                     for i, (dx, dy) in enumerate(offsets):
                         unit.models[i].x = x + dx
                         unit.models[i].y = y + dy
@@ -268,7 +286,13 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                         log(f"❌ Placement invalid: {reason}")
                         continue
                     formation = get_input("Choose formation (box/triangle/circle):").strip().lower()
-                    offsets = formation_offsets(formation, len(unit.models), orientation)
+                    offsets = formation_offsets(
+                        formation,
+                        len(unit.models),
+                        orientation,
+                        unit.base_width,
+                        unit.base_height,
+                    )
                     for i, (dx, dy) in enumerate(offsets):
                         unit.models[i].x = x + dx
                         unit.models[i].y = y + dy
