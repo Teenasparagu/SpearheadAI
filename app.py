@@ -7,17 +7,17 @@ import math
 engine = GameEngine()
 
 
-def _triangle_offsets(num, orientation):
+def _triangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     """Wrapper using deployment's triangle formation."""
-    return formation_offsets("triangle", num, orientation)
+    return formation_offsets("triangle", num, orientation, base_width, base_height)
 
 
-def _rectangle_offsets(num, orientation):
-    return formation_offsets("box", num, orientation)
+def _rectangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
+    return formation_offsets("box", num, orientation, base_width, base_height)
 
 
-def _circle_offsets(num, orientation):
-    return formation_offsets("circle", num, orientation)
+def _circle_offsets(num, orientation, base_width=1.0, base_height=1.0):
+    return formation_offsets("circle", num, orientation, base_width, base_height)
 
 app = Flask(__name__)
 
