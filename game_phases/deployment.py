@@ -100,15 +100,17 @@ def _triangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     offsets = [(0, 0)]
     placed = 1
     row = 2
-    x_step = int(round(base_width / 0.5))
-    y_step = int(round(base_height / 0.5))
+
+    x_step = math.ceil(base_width / 0.5)
+    y_step = math.ceil(base_height / 0.5)
     y = -orientation * y_step
     while placed < num:
-        start_x = -(row - 1) * x_step
+        start_x = -round((row - 1) / 2 * x_step)
         for i in range(row):
             if placed >= num:
                 break
-            offsets.append((start_x + 2 * x_step * i, y))
+            offsets.append((start_x + i * x_step, y))
+
             placed += 1
         row += 1
         y -= orientation * y_step
@@ -120,18 +122,22 @@ def _rectangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     offsets = [(0, 0)]
     cols = math.ceil(math.sqrt(num))
     rows = math.ceil(num / cols)
-    x_step = int(round(base_width / 0.5))
-    y_step = int(round(base_height / 0.5))
+
+    x_step = math.ceil(base_width / 0.5)
+    y_step = math.ceil(base_height / 0.5)
+
     placed = 1
     for r in range(rows):
         if placed >= num:
             break
         y = -(r + 1) * orientation * y_step
-        start_x = -(cols - 1) * x_step
+
+        start_x = -round((cols - 1) / 2 * x_step)
         for c in range(cols):
             if placed >= num:
                 break
-            offsets.append((start_x + 2 * x_step * c, y))
+            offsets.append((start_x + c * x_step, y))
+
             placed += 1
     return offsets
 
@@ -140,8 +146,10 @@ def _circle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     """Offsets spreading models in a semicircle behind the leader."""
     offsets = [(0, 0)]
     spiral = generate_spiral_offsets(radius=6)
-    x_step = int(round(base_width / 0.5))
-    y_step = int(round(base_height / 0.5))
+
+    x_step = math.ceil(base_width / 0.5)
+    y_step = math.ceil(base_height / 0.5)
+
     for dx, dy in spiral[1:]:
         if len(offsets) >= num:
             break

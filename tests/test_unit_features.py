@@ -50,4 +50,8 @@ def test_triangle_offsets_coherent_placement():
         unit.models[i].y = unit.y + dy
 
     assert board.place_unit(unit)
+    occupied = []
+    for model in unit.models:
+        occupied.extend(model.get_occupied_squares())
+    assert len(occupied) == len(set(occupied))
 
