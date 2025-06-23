@@ -1,5 +1,14 @@
-from game_logic.units import Unit
-from .faction_factory import FactionFactory
+"""Faction definitions for Stormcast forces."""
+
+try:  # pragma: no cover - allow running as a script
+    from ..units import Unit
+    from .faction_factory import FactionFactory
+except ImportError:  # fallback when executed directly
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+    from game_logic.units import Unit
+    from game_logic.factions.faction_factory import FactionFactory
 
 class StormcastFactory(FactionFactory):
     faction_name= "stormcast"

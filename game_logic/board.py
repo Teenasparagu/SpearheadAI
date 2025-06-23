@@ -144,17 +144,16 @@ class Board:
 
         model = unit.models[model_idx]
 
-        def _squares(x, y, diameter):
+        def _squares(x, y, width, height):
             occ = []
-            radius = diameter / 2.0
-            tiles = int(round(radius / 0.5))
-            for dx in range(-tiles, tiles + 1):
-                for dy in range(-tiles, tiles + 1):
-                    if math.sqrt(dx**2 + dy**2) <= tiles + 0.01:
-                        occ.append((x + dx, y + dy))
+            w_tiles = int(round(width / 0.5))
+            h_tiles = int(round(height / 0.5))
+            for dx in range(w_tiles):
+                for dy in range(h_tiles):
+                    occ.append((x + dx, y + dy))
             return occ
 
-        new_squares = _squares(dest_x, dest_y, model.base_diameter)
+        new_squares = _squares(dest_x, dest_y, model.base_width, model.base_height)
         current_squares = set(model.get_occupied_squares())
         unit_squares = set()
         for m in unit.models:
