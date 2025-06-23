@@ -16,7 +16,7 @@
             border-collapse: collapse;
             margin: auto;
         }
-        table.grid td {
+        table.grid td, table.grid th {
             width: 15px;
             height: 15px;
             text-align: center;
@@ -61,8 +61,15 @@
     <h1>Spearhead AI – Game Board</h1>
 
     <table class="grid">
+        <tr>
+            <th></th>
+            {% for x in range(width) %}
+                <th class="coord">{{ x }}</th>
+            {% endfor %}
+        </tr>
         {% for y in range(height) %}
         <tr>
+            <th class="coord">{{ y }}</th>
             {% for x in range(width) %}
             {% set cell = grid[(x, y)] %}
             <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000'] else 'black' }}">
@@ -77,13 +84,14 @@
         <form method="POST">
             <label><strong>{{ prompt_label }}</strong></label><br><br>
             {% if choices %}
+                <div style="margin-bottom:10px;">
                 {% for c in choices %}
-                    <button type="submit" name="input" value="{{ c.value }}">{{ c.label }}</button>
+                    <div>{{ c.value }} = {{ c.label }}</div>
                 {% endfor %}
-            {% else %}
-                <input type="text" name="input" required>
-                <button type="submit">Submit</button>
+                </div>
             {% endif %}
+            <input type="text" name="input" required>
+            <button type="submit">Submit</button>
         </form>
     </div>
 

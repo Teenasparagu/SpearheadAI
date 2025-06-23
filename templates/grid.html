@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- Refresh less frequently so the CLI remains readable -->
+    <meta http-equiv="refresh" content="10">
     <title>Spearhead AI - Game Grid</title>
     <style>
         body {
@@ -13,7 +15,7 @@
             border-collapse: collapse;
             margin: auto;
         }
-        table.grid td {
+        table.grid td, table.grid th {
             width: 15px;
             height: 15px;
             text-align: center;
@@ -54,8 +56,15 @@
     <h1 style="text-align:center;">Spearhead AI – Game Grid</h1>
 
     <table class="grid">
+        <tr>
+            <th></th>
+            {% for x in range(width) %}
+                <th class="coord">{{ x }}</th>
+            {% endfor %}
+        </tr>
         {% for y in range(height) %}
         <tr>
+            <th class="coord">{{ y }}</th>
             {% for x in range(width) %}
             {% set cell = grid[(x, y)] %}
             <td style="background-color: {{ cell.color }}; color: {{ 'white' if cell.color in ['black', '#0044cc', '#cc0000'] else 'black' }}">

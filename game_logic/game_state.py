@@ -56,21 +56,24 @@ class GameState:
                 elif team == 2:
                     grid[(obj.x, obj.y)]["control2"] = 1
 
-        # Mark units and stats
-        for unit in self.units["player"] + self.units["ai"]:
+        # Mark units and stats using the board as the source of truth
+        # so placements are reflected immediately.
+        for unit in self.board.units:
             for i, model in enumerate(unit.models):
-                if 0 <= model.x < self.width and 0 <= model.y < self.height:
-                    tile = grid[(model.x, model.y)]
-                    if unit.team == 1:
-                        tile["team1"] = 1
-                        if i == 0:
-                            tile["leader1"] = 1
-                    else:
-                        tile["team2"] = 1
-                        if i == 0:
-                            tile["leader2"] = 1
-                    tile["move_range"] = unit.move_range / 12  # Normalize max 12"
-                    tile["control_score"] = unit.control_score / 5  # Assume max 5
+                occupied = model.get_occupied_squares()
+                for ox, oy in occupied:
+                    if 0 <= ox < self.width and 0 <= oy < self.height:
+                        tile = grid[(ox, oy)]
+                        if unit.team == 1:
+                            tile["team1"] = 1
+                            if i == 0 and (ox, oy) == (model.x, model.y):
+                                tile["leader1"] = 1
+                        else:
+                            tile["team2"] = 1
+                            if i == 0 and (ox, oy) == (model.x, model.y):
+                                tile["leader2"] = 1
+                        tile["move_range"] = unit.move_range / 12  # Normalize max 12"
+                        tile["control_score"] = unit.control_score / 5  # Assume max 5
 
         return grid
 
