@@ -8,9 +8,15 @@ class Model:
     x: int
     y: int
     max_health: int = 1
-    base_diameter: float = 1.0
+    base_width: float = 1.0
+    base_height: float = 1.0
     ranged_attacks: list = field(default_factory=list)
     current_health: int = field(init=False)
+
+    @property
+    def base_diameter(self) -> float:
+        """Largest dimension of the model's base."""
+        return max(self.base_width, self.base_height)
 
     def __post_init__(self):
         self.current_health = self.max_health
@@ -27,19 +33,21 @@ class Model:
         return self.x, self.y
 
     def get_occupied_squares(self):
+        """Return the board squares occupied by this model."""
         occupied = []
-        radius = self.base_diameter / 2.0
-        radius_in_tiles = int(round(radius / 0.5))
+        width_tiles = int(round(self.base_width / 0.5))
+        height_tiles = int(round(self.base_height / 0.5))
 
-        for dx in range(-radius_in_tiles, radius_in_tiles + 1):
-            for dy in range(-radius_in_tiles, radius_in_tiles + 1):
-                dist = math.sqrt(dx**2 + dy**2)
-                if dist <= radius_in_tiles + 0.01:
-                    occupied.append((self.x + dx, self.y + dy))
+        for dx in range(width_tiles):
+            for dy in range(height_tiles):
+                occupied.append((self.x + dx, self.y + dy))
         return occupied
 
     def __repr__(self):
-        return f"Model({self.x}, {self.y}, base={self.base_diameter}\")"
+        return (
+            f"Model({self.x}, {self.y}, base_width={self.base_width}, "
+            f"base_height={self.base_height})"
+        )
 
 
 @dataclass
@@ -80,9 +88,9 @@ class Unit:
 
         leader_x = self.x
         leader_y = self.y
-        base_diameter = max(self.base_width, self.base_height)
 
-        self.models = [Model(leader_x, leader_y, max_health=model_health, base_diameter=base_diameter)]
+        self.models = [Model(leader_x, leader_y, max_health=model_health,
+                             base_width=self.base_width, base_height=self.base_height)]
 
         placed_positions = {(leader_x, leader_y)}
         ring_radius = 1
@@ -95,7 +103,10 @@ class Unit:
                     new_y = leader_y + dy
                     if (new_x, new_y) not in placed_positions:
                         placed_positions.add((new_x, new_y))
-                        self.models.append(Model(new_x, new_y, max_health=model_health, base_diameter=base_diameter))
+                        self.models.append(Model(new_x, new_y,
+                                                max_health=model_health,
+                                                base_width=self.base_width,
+                                                base_height=self.base_height))
                         model_index += 1
                         if model_index >= self.num_models:
                             break

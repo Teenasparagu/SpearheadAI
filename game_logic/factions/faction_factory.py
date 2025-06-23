@@ -1,4 +1,12 @@
-from game_logic.units import Unit
+"""Base factory for building faction forces."""
+
+try:  # pragma: no cover - allow running as a script
+    from ..units import Unit
+except ImportError:  # fallback when executed directly
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+    from game_logic.units import Unit
 
 class FactionFactory:
     faction_name = None
