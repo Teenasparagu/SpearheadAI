@@ -39,10 +39,19 @@ def test_triangle_offsets_coherent_placement():
     )
     from app import _triangle_offsets
 
-    offsets = _triangle_offsets(len(unit.models), orientation=1)
+    offsets = _triangle_offsets(
+        len(unit.models),
+        orientation=1,
+        base_width=unit.base_width,
+        base_height=unit.base_height,
+    )
     for i, (dx, dy) in enumerate(offsets):
         unit.models[i].x = unit.x + dx
         unit.models[i].y = unit.y + dy
 
     assert board.place_unit(unit)
+    occupied = []
+    for model in unit.models:
+        occupied.extend(model.get_occupied_squares())
+    assert len(occupied) == len(set(occupied))
 
