@@ -103,10 +103,24 @@ class Board:
         return True
 
     def is_path_blocked(self, path, start_pos, unit=None):
+        """Return True if any tile along ``path`` is blocked by terrain or other
+        units.
+
+        ``unit`` represents the moving unit and all squares occupied by this
+        unit are ignored when checking for obstructions. This prevents the
+        moving unit from being considered an obstacle to itself when it spans
+        multiple board squares.
+        """
+
+        ignore_squares = set()
+        if unit:
+            for m in unit.models:
+                ignore_squares.update(m.get_occupied_squares())
+
         for x, y in path:
             if (x, y) != start_pos:
                 if self.grid[y][x] not in (TILE_EMPTY, TILE_OBJECTIVE):
-                    if unit and any(model.x == x and model.y == y for model in unit.models):
+                    if (x, y) in ignore_squares:
                         continue
                     return True, (x, y)
         return False, None
