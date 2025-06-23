@@ -653,15 +653,25 @@ def unit_placement():
         step = state.get("step")
         if step == "manual":
             for i, (mx, my) in enumerate(state.get("model_positions", [])):
-                preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
+                m = current_unit.models[i]
+                preview.extend(Model(mx, my, base_width=m.base_width,
+                                    base_height=m.base_height).get_occupied_squares())
             if state.get("pos") is not None and len(state.get("model_positions", [])) < len(current_unit.models):
                 idx = len(state["model_positions"])
-                preview.extend(Model(state["pos"][0], state["pos"][1], base_diameter=current_unit.models[idx].base_diameter).get_occupied_squares())
+                m = current_unit.models[idx]
+                preview.extend(Model(state["pos"][0], state["pos"][1],
+                                    base_width=m.base_width,
+                                    base_height=m.base_height).get_occupied_squares())
         elif step == "review" and state.get("auto_positions"):
             for i, (mx, my) in enumerate(state.get("auto_positions", [])):
-                preview.extend(Model(mx, my, base_diameter=current_unit.models[i].base_diameter).get_occupied_squares())
+                m = current_unit.models[i]
+                preview.extend(Model(mx, my, base_width=m.base_width,
+                                    base_height=m.base_height).get_occupied_squares())
         elif step == "choose_form" and state.get("pos") is not None:
-            preview.extend(Model(state["pos"][0], state["pos"][1], base_diameter=current_unit.models[0].base_diameter).get_occupied_squares())
+            m = current_unit.models[0]
+            preview.extend(Model(state["pos"][0], state["pos"][1],
+                                base_width=m.base_width,
+                                base_height=m.base_height).get_occupied_squares())
 
     display_grid = build_display_grid(game_state, board, preview=preview)
 
