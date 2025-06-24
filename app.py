@@ -1,4 +1,9 @@
-from flask import Flask, render_template
+try:
+    from flask import Flask, jsonify, redirect, request
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Flask is required to run the web viewer. Install dependencies via 'pip install -r requirements.txt'."
+    ) from exc
 from game_logic.game_engine import GameEngine
 from game_phases.deployment import get_deployment_zones, formation_offsets
 import math
@@ -19,7 +24,7 @@ def _rectangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
 def _circle_offsets(num, orientation, base_width=1.0, base_height=1.0):
     return formation_offsets("circle", num, orientation, base_width, base_height)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="frontend", static_url_path="")
 
 
 def build_display_grid(game_state, board):
@@ -70,17 +75,43 @@ def build_display_grid(game_state, board):
     return display_grid
 
 
-@app.route("/")
-def show_board():
-    """Render the board in its current state."""
+@app.route("/api/state")
+def api_state():
+    """Return board state data as JSON for the React frontend."""
     grid = build_display_grid(engine.game_state, engine.board)
-    return render_template(
-        "grid.html",
-        grid=grid,
-        width=engine.board.width,
-        height=engine.board.height,
-        messages=engine.game_state.messages,
-    )
+    width = engine.board.width
+    height = engine.board.height
+    grid_matrix = [[grid[(x, y)] for x in range(width)] for y in range(height)]
+    return jsonify({
+        "grid": grid_matrix,
+        "width": width,
+        "height": height,
+        "messages": engine.game_state.messages,
+    })
+
+
+@app.route("/api/input", methods=["POST"])
+def api_input():
+    """Accept a simple text input and log it to the game messages."""
+    data = request.get_json(force=True)
+    if not data or "input" not in data:
+        return jsonify({"error": "missing input"}), 400
+    engine.game_state.messages.append(str(data["input"]))
+    return jsonify({"status": "ok"})
+
+
+@app.route("/reset")
+def reset_game():
+    """Reset the game and redirect to the main page."""
+    global engine
+    engine = GameEngine()
+    return redirect("/")
+
+
+@app.route("/")
+def index():
+    """Serve the React application."""
+    return app.send_static_file("index.html")
 
 
 
