@@ -63,9 +63,30 @@ def _nearest_enemy(unit, enemy_units):
     return closest, min_dist
 
 
-def resolve_melee_attacks(unit, enemy_units, log):
-    """Resolve melee attacks from ``unit`` against the nearest enemy unit."""
-    target, distance = _nearest_enemy(unit, enemy_units)
+def _distance_between_units(a, b):
+    min_dist = float("inf")
+    for m in a.models:
+        for e in b.models:
+            d = math.sqrt((m.x - e.x) ** 2 + (m.y - e.y) ** 2)
+            if d < min_dist:
+                min_dist = d
+    return min_dist
+
+
+def _targets_in_range(unit, enemies, max_dist=3):
+    res = []
+    for enemy in enemies:
+        if _distance_between_units(unit, enemy) <= max_dist:
+            res.append(enemy)
+    return res
+
+
+def resolve_melee_attacks(unit, enemy_units, log, target=None):
+    """Resolve melee attacks from ``unit`` against ``target`` or the nearest enemy."""
+    if target is None:
+        target, distance = _nearest_enemy(unit, enemy_units)
+    else:
+        distance = _distance_between_units(unit, target)
     if not target or distance > 3:
         log("No enemies in melee range.")
         return
@@ -114,7 +135,7 @@ def resolve_melee_attacks(unit, enemy_units, log):
         f"{target.name} took {total_damage} wounds, {models_before - models_after} models died, {models_after} remain."
     )
 
-def _alternate_fights(board, enemy_map, units_by_team, start_team, log):
+def _alternate_fights(board, enemy_map, units_by_team, start_team, get_input, log):
     """Alternate activations between teams for the given ``units_by_team``."""
     active = start_team
     inactive = 2 if start_team == 1 else 1
@@ -123,12 +144,58 @@ def _alternate_fights(board, enemy_map, units_by_team, start_team, log):
         if not team_units:
             active, inactive = inactive, active
             continue
-        unit = team_units.pop(0)
+
+        if active == 1:
+            # player chooses the unit
+            while True:
+                log("\nUnits available to fight:")
+                for idx, u in enumerate(team_units, 1):
+                    log(f"{idx}. {u.name}")
+                resp = get_input("Choose a unit to fight (number): ").strip()
+                try:
+                    choice = int(resp)
+                except (ValueError, TypeError):
+                    choice = 1
+                if 1 <= choice <= len(team_units):
+                    unit = team_units.pop(choice - 1)
+                    break
+                log("Invalid selection.")
+        else:
+            unit = team_units.pop(0)
+
         if not unit.models:
             continue
+
         log(f"\n{unit.name} (Team {unit.team}) activates!")
         pile_in(board, unit, enemy_map[unit.team])
-        resolve_melee_attacks(unit, enemy_map[unit.team], log)
+
+        # choose target
+        targets = _targets_in_range(unit, enemy_map[unit.team])
+        target = None
+        if not targets:
+            log("No enemies in melee range.")
+        else:
+            if active == 1 and len(targets) > 1:
+                while True:
+                    log("Targets in range:")
+                    for idx, t in enumerate(targets, 1):
+                        log(f"{idx}. {t.name}")
+                    resp = get_input("Choose target (number): ").strip()
+                    try:
+                        t_choice = int(resp)
+                    except (ValueError, TypeError):
+                        t_choice = 1
+                    if 1 <= t_choice <= len(targets):
+                        target = targets[t_choice - 1]
+                        break
+                    log("Invalid selection.")
+            else:
+                # AI or only one target
+                target, _ = _nearest_enemy(unit, enemy_map[unit.team])
+
+        if target:
+            resolve_melee_attacks(unit, enemy_map[unit.team], log, target=target)
+
         active, inactive = inactive, active
 
 
@@ -162,8 +229,8 @@ def combat_phase(board, current_team, player_units, ai_units, get_input, log):
     log("\n>> Combat Phase Begins!")
     log("Resolving combat abilities... (placeholder)")
 
-    _alternate_fights(board, enemy_map, strike_first, current_team, log)
-    _alternate_fights(board, enemy_map, normal, current_team, log)
-    _alternate_fights(board, enemy_map, strike_last, current_team, log)
+    _alternate_fights(board, enemy_map, strike_first, current_team, get_input, log)
+    _alternate_fights(board, enemy_map, normal, current_team, get_input, log)
+    _alternate_fights(board, enemy_map, strike_last, current_team, get_input, log)
 
     log(">> Combat Phase Ends.\n")
