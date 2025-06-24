@@ -50,21 +50,32 @@ class GameEngine:
         self.board.update_objective_control()
         self.board.display_objective_status()
 
+        def _pause(next_phase: str) -> None:
+            """Pause until the player is ready to proceed to the given phase."""
+            prompt = f"\nPress Enter to begin the {next_phase.capitalize()} Phase..."
+            get_input(prompt)
+
         self.game_state.phase = "movement"
         if team == 'player':
             movement_phase.player_movement_phase(self.board, self.game_state.units['player'], get_input, log)
         else:
             movement_phase.ai_movement_phase(self.board, self.game_state.units['ai'], get_input, log)
 
+        _pause("shooting")
+
         self.game_state.phase = "shooting"
         if team == 'player':
             shooting_phase.player_shooting_phase(self.board, self.game_state.units['player'], self.game_state.units['ai'], get_input, log)
+
+        _pause("charge")
 
         self.game_state.phase = "charge"
         if team == 'player':
             charge_phase.charge_phase(self.board, self.game_state.units['player'], get_input, log)
         else:
             charge_phase.ai_charge_phase(self.board, self.game_state.units['ai'], self.game_state.units['player'], get_input, log)
+
+        _pause("combat")
 
         self.game_state.phase = "combat"
         current_team_num = 1 if team == 'player' else 2
@@ -73,6 +84,8 @@ class GameEngine:
                                   ai_units=self.game_state.units['ai'],
                                   get_input=get_input, log=log)
 
+        _pause("end")
+
         self.game_state.phase = "end"
         end_units = self.game_state.units['player'] if team == 'player' else self.game_state.units['ai']
         victory_phase.process_end_phase_actions(self.board, end_units, get_input, log)
@@ -80,6 +93,8 @@ class GameEngine:
         log("\n[End of Round Objective Check]")
         self.board.update_objective_control()
         self.board.display_objective_status()
+
+        _pause("victory")
 
         self.game_state.phase = "victory"
         scoring_team = 1 if team == 'player' else 2
