@@ -1,6 +1,31 @@
 import math
 import random
 
+
+def _place_model_near(board, unit, model_idx: int, target_x: int, target_y: int,
+                      max_dist: int, log) -> bool:
+    """Attempt to place ``model_idx`` near ``target_x, target_y``.
+
+    Searches outward one square at a time until a valid location is found that
+    does not exceed ``max_dist`` from the model's starting position.
+    Returns ``True`` if the model is successfully placed.
+    """
+    start_x = unit.models[model_idx].x
+    start_y = unit.models[model_idx].y
+
+    for radius in range(max_dist + 1):
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                x = target_x + dx
+                y = target_y + dy
+                if math.sqrt((x - start_x) ** 2 + (y - start_y) ** 2) > max_dist:
+                    continue
+                if not (0 <= x < board.width and 0 <= y < board.height):
+                    continue
+                if board.move_model(unit, model_idx, x, y):
+                    return True
+    return False
+
 def is_near_enemy(unit, board, within_inches=12):
     limit = within_inches * 2
     for model in unit.models:
@@ -108,15 +133,77 @@ def charge_phase(board, player_units, get_input, log):
             log("Charge cancelled.")
             continue
 
-        # ``move_unit`` does not take a ``confirm`` parameter. This keyword was
-        # erroneously passed and resulted in a ``TypeError`` during runtime
-        # when a player accepted a charge. Calling the method with only the
-        # expected arguments resolves the issue.
-        success = board.move_unit(unit, dest_x, dest_y)
-        if success:
-            log(f"{unit.name} successfully charged {target_unit.name}!")
+        auto = get_input("Let the computer place models automatically? (Y/N): ")
+        auto = auto.strip().lower()
+
+        original_pos = [(m.x, m.y) for m in unit.models]
+
+        if auto in ["y", "yes", "a", "auto"]:
+            success = board.move_unit(unit, dest_x, dest_y)
+            if not success:
+                log("Destination occupied! Attempting individual placement...")
+                dx_total = dest_x - unit.x
+                dy_total = dest_y - unit.y
+                success = True
+                for idx, m in enumerate(unit.models):
+                    tx = original_pos[idx][0] + dx_total
+                    ty = original_pos[idx][1] + dy_total
+                    if not _place_model_near(board, unit, idx, tx, ty,
+                                             int(max_distance_squares), log):
+                        success = False
+                        break
+            if success:
+                confirm = get_input(
+                    "Are all model locations acceptable? (Y/N): "
+                ).strip().lower()
+                if confirm in ["y", "yes"]:
+                    log(f"{unit.name} successfully charged {target_unit.name}!")
+                else:
+                    for i, (ox, oy) in enumerate(original_pos):
+                        board.move_model(unit, i, ox, oy)
+                    log("Charge cancelled.")
+            else:
+                for i, (ox, oy) in enumerate(original_pos):
+                    board.move_model(unit, i, ox, oy)
+                log("Charge failed during move.")
         else:
-            log("Charge failed during move.")
+            success = True
+            for idx, m in enumerate(unit.models):
+                label = "Leader" if idx == 0 else f"Model {idx}"
+                while True:
+                    resp = get_input(
+                        f"Enter destination for {label} as 'x y': "
+                    ).strip().lower()
+                    try:
+                        x_str, y_str = resp.split()
+                        tx = int(x_str)
+                        ty = int(y_str)
+                    except ValueError:
+                        log("Invalid input format. Use 'x y'.")
+                        continue
+                    if math.sqrt(
+                        (tx - original_pos[idx][0]) ** 2
+                        + (ty - original_pos[idx][1]) ** 2
+                    ) > max_distance_squares:
+                        log("That position is beyond the charge distance.")
+                        continue
+                    if board.move_model(unit, idx, tx, ty):
+                        break
+                    log("Position invalid. Searching nearby...")
+                    if _place_model_near(
+                        board, unit, idx, tx, ty, int(max_distance_squares), log
+                    ):
+                        break
+                    log("Unable to place model. Try again.")
+            confirm = get_input(
+                "Are all model locations acceptable? (Y/N): "
+            ).strip().lower()
+            if confirm not in ["y", "yes"]:
+                for i, (ox, oy) in enumerate(original_pos):
+                    board.move_model(unit, i, ox, oy)
+                log("Charge cancelled.")
+            else:
+                log(f"{unit.name} successfully charged {target_unit.name}!")
 
 def ai_charge_phase(board, ai_units, player_units, get_input, log):
     log("\n--- AI Charge Phase ---")

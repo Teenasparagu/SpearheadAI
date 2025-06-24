@@ -127,7 +127,7 @@ def test_charge_phase_calls_move_unit(monkeypatch):
     monkeypatch.setattr(board, "move_unit", mock_move_unit)
     monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
 
-    responses = iter(["y", "1", "y"])
+    responses = iter(["y", "1", "y", "y", "y"])
 
     def get_input(_):
         return next(responses)
