@@ -8,10 +8,41 @@ except ModuleNotFoundError as exc:
 
 from game_logic.game_engine import GameEngine
 from game_phases.deployment import get_deployment_zones, formation_offsets
+from game_logic.game_engine import run_deployment_phase
 import math
+from queue import Queue
+from threading import Thread
 
 # Shared engine instance used by the CLI runner and this viewer
 engine = GameEngine()
+
+# Queues used for asynchronous deployment interaction
+input_queue: Queue[str] = Queue()
+output_queue: Queue[dict] = Queue()
+deployment_thread: Thread | None = None
+
+
+def _start_deployment_thread() -> None:
+    """Launch the deployment phase in a background thread if not already running."""
+    global deployment_thread, engine
+    if deployment_thread and deployment_thread.is_alive():
+        return
+
+    engine = GameEngine()
+
+    def run() -> None:
+        def _get_input(prompt: str) -> str:
+            output_queue.put({"type": "prompt", "text": prompt})
+            return input_queue.get()
+
+        def _log(msg: str) -> None:
+            output_queue.put({"type": "log", "text": msg})
+
+        run_deployment_phase(engine.game_state, engine.board, _get_input, _log)
+        output_queue.put({"type": "done"})
+
+    deployment_thread = Thread(target=run, daemon=True)
+    deployment_thread.start()
 
 
 def _triangle_offsets(num, orientation, base_width=1.0, base_height=1.0):
@@ -103,12 +134,42 @@ def api_input():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/start_deployment", methods=["POST"])
+def api_start_deployment():
+    """Begin the deployment phase in a background thread."""
+    _start_deployment_thread()
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/messages")
+def api_messages():
+    """Return any pending log or prompt messages from the deployment thread."""
+    messages = []
+    while not output_queue.empty():
+        messages.append(output_queue.get())
+    return jsonify(messages)
+
+
+@app.route("/api/answer", methods=["POST"])
+def api_answer():
+    """Send an answer back to the deployment thread."""
+    data = request.get_json(force=True)
+    ans = data.get("answer", "")
+    input_queue.put(str(ans))
+    return jsonify({"status": "ok"})
+
+
 
 @app.route("/reset")
 def reset_game():
     """Reset the game and redirect to the main page."""
-    global engine
+    global engine, deployment_thread
     engine = GameEngine()
+    deployment_thread = None
+    while not input_queue.empty():
+        input_queue.get()
+    while not output_queue.empty():
+        output_queue.get()
     return redirect("/")
 
 
