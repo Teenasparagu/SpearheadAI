@@ -52,12 +52,25 @@ class Board:
         return True
 
     def place_unit(self, unit: Unit):
-        """Place unit without validation for debugging."""
-        self.units.append(unit)
+        """Place a unit on the board ensuring all models fit within bounds."""
+
+        # Validate that all model squares are on the board and unoccupied
+        pending = []
         for model in unit.models:
             for x, y in model.get_occupied_squares():
-                if 0 <= x < self.width and 0 <= y < self.height:
-                    self.grid[y][x] = TILE_UNIT
+                if not (0 <= x < self.width and 0 <= y < self.height):
+                    print("Placement out of bounds!")
+                    return False
+                if self.grid[y][x] != TILE_EMPTY:
+                    print("Placement occupied!")
+                    return False
+                pending.append((x, y))
+
+        # All squares valid, perform placement
+        for x, y in pending:
+            self.grid[y][x] = TILE_UNIT
+
+        self.units.append(unit)
         print(f"{unit.name} placed successfully.")
         return True
 
@@ -174,12 +187,14 @@ class Board:
         # clear current squares
         for m in unit.models:
             for x, y in m.get_occupied_squares():
-                self.grid[y][x] = TILE_EMPTY
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.grid[y][x] = TILE_EMPTY
 
         # apply new positions
         for idx, (new_x, new_y, new_sq) in enumerate(new_positions):
             for x, y in new_sq:
-                self.grid[y][x] = TILE_UNIT
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.grid[y][x] = TILE_UNIT
             unit.models[idx].x = new_x
             unit.models[idx].y = new_y
 
