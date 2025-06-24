@@ -1,32 +1,6 @@
 import math
 import random
 
-
-def _place_model_near(board, unit, model_idx: int, target_x: int, target_y: int,
-                      max_dist: int, log, *, enforce_coherency: bool = True) -> bool:
-    """Attempt to place ``model_idx`` near ``target_x, target_y``.
-
-    Searches outward one square at a time until a valid location is found that
-    does not exceed ``max_dist`` from the model's starting position.
-    Returns ``True`` if the model is successfully placed.
-    """
-    start_x = unit.models[model_idx].x
-    start_y = unit.models[model_idx].y
-
-    for radius in range(max_dist + 1):
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                x = target_x + dx
-                y = target_y + dy
-                if math.sqrt((x - start_x) ** 2 + (y - start_y) ** 2) > max_dist:
-                    continue
-                if not (0 <= x < board.width and 0 <= y < board.height):
-                    continue
-                if board.move_model(unit, model_idx, x, y,
-                                    enforce_coherency=enforce_coherency):
-                    return True
-    return False
-
 def is_near_enemy(unit, board, within_inches=12):
     limit = within_inches * 2
     for model in unit.models:
@@ -38,164 +12,62 @@ def is_near_enemy(unit, board, within_inches=12):
                         return True
     return False
 
+
+def ai_charge_phase(board, ai_units, player_units, get_input, log):
+    """AI skips charging for now."""
+    log("\n--- AI Charge Phase ---")
+    for unit in ai_units:
+        log(f"{unit.name} does not charge.")
+
 def charge_phase(board, player_units, get_input, log):
+    """Handle the player's charge phase with manual placement only."""
     log("\n--- Charge Phase ---")
 
-    for unit in player_units:
-        if unit.has_run:
-            log(f"{unit.name} ran this turn and cannot charge.")
-            continue
-
-        if not is_near_enemy(unit, board, within_inches=12):
-            log(f"{unit.name} is too far from any enemy to charge.")
-            continue
-
-        log(f"{unit.name} is eligible to charge.")
-        choice = get_input("Attempt charge? (Y/N): ").strip().lower()
-        if choice not in ["y", "yes"]:
-            log(f"{unit.name} skips charging.")
-            continue
-
-        charge_roll = random.randint(1, 6) + random.randint(1, 6)
-        max_distance_squares = charge_roll * 2
-        log(f"Rolled a charge distance of {charge_roll} inches.")
-
-        # Find chargeable enemy units
-        charge_targets = []
-        listed_units = []
-
-        for enemy_unit in board.units:
-            if enemy_unit.team != unit.team:
-                for model in enemy_unit.models:
-                    for friendly_model in unit.models:
-                        dist = math.sqrt((friendly_model.x - model.x)**2 + (friendly_model.y - model.y)**2)
-                        if dist <= max_distance_squares:
-                            if enemy_unit not in listed_units:
-                                listed_units.append(enemy_unit)
-                            break
-
-        if not listed_units:
-            log("No valid targets in range.")
-            continue
-
-        log("You may charge the following enemy units:")
-        for i, enemy_unit in enumerate(listed_units):
-            log(f"{i + 1}. {enemy_unit.name}")
-
+    remaining = [u for u in player_units if not u.has_run]
+    while remaining:
+        log("Units able to charge:")
+        for i, unit in enumerate(remaining, 1):
+            log(f"{i}. {unit.name}")
+        log("0. Done")
         try:
-            selection = int(get_input("Select target unit number: ").strip()) - 1
-            target_unit = listed_units[selection]
-        except (ValueError, IndexError):
+            choice = int(get_input("Select unit to charge (0 to finish): ").strip())
+        except ValueError:
             log("Invalid selection.")
             continue
-
-        # Find closest model in that unit
-        closest_model = None
-        closest_dist = float("inf")
-        for model in target_unit.models:
-            dist = math.sqrt((unit.x - model.x)**2 + (unit.y - model.y)**2)
-            if dist < closest_dist:
-                closest_model = model
-                closest_dist = dist
-
-        if closest_model is None:
-            log("No valid target model found.")
+        if choice == 0:
+            break
+        if choice < 1 or choice > len(remaining):
+            log("Invalid selection.")
             continue
+        unit = remaining.pop(choice - 1)
 
-        # Determine a destination 1 square away from the target model
-        dx = closest_model.x - unit.x
-        dy = closest_model.y - unit.y
-        dist = math.sqrt(dx**2 + dy**2)
+        charge_roll = random.randint(1, 6) + random.randint(1, 6)
+        log(f"Rolled a charge distance of {charge_roll} inches.")
+        max_distance_squares = charge_roll * 2
 
-        if dist == 0:
-            log("Target model is on top of your model. Charge fails.")
+        if not is_near_enemy(unit, board, within_inches=charge_roll):
+            log("No enemy units within charge range.")
             continue
-
-        def _sgn(val: float) -> int:
-            if val > 0:
-                return 1
-            if val < 0:
-                return -1
-            return 0
-
-        # Move toward the target along the approach vector
-        dest_x = closest_model.x - _sgn(dx)
-        dest_y = closest_model.y - _sgn(dy)
-
-        if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
-            log("Proposed charge destination is out of bounds.")
-            continue
-
-        # Check for blocked path
-        path = board.get_path(unit.x, unit.y, dest_x, dest_y)
-        blocked, blocked_tile = board.is_path_blocked(path, (unit.x, unit.y), unit)
-        if blocked:
-            log(f"Charge path is blocked at {blocked_tile}. Charge fails.")
-            continue
-
-        log(f"Proposed charge destination: ({dest_x}, {dest_y})")
-        accept = get_input("Accept this charge? (Y/N): ").strip().lower()
-        if accept not in ["y", "yes"]:
-            log("Charge cancelled.")
-            continue
-
-        auto = get_input("Let the computer place models automatically? (Y/N): ")
-        auto = auto.strip().lower()
 
         original_pos = [(m.x, m.y) for m in unit.models]
 
-        if auto in ["y", "yes", "a", "auto"]:
-            success = board.move_unit(unit, dest_x, dest_y)
-            if not success:
-                log("Destination occupied! Attempting individual placement...")
-                dx_total = dest_x - unit.x
-                dy_total = dest_y - unit.y
-                success = True
-                for idx, m in enumerate(unit.models):
-                    tx = original_pos[idx][0] + dx_total
-                    ty = original_pos[idx][1] + dy_total
-                    if not _place_model_near(board, unit, idx, tx, ty,
-                                             int(max_distance_squares), log,
-                                             enforce_coherency=False):
-                        success = False
-                        break
-            if success:
-                if not board.units_base_to_base(unit, target_unit):
-                    success = False
-                    log("Charge must end base-to-base with the target.")
-
-            if success and board.models_overlap():
-                success = False
-                log("Charge results in overlapping models.")
-
-            if success:
-                confirm = get_input(
-                    "Are all model locations acceptable? (Y/N): "
-                ).strip().lower()
-                if confirm in ["y", "yes"]:
-                    log(f"{unit.name} successfully charged {target_unit.name}!")
-                else:
-                    for i, (ox, oy) in enumerate(original_pos):
-                        board.move_model(unit, i, ox, oy)
-                    log("Charge cancelled.")
-            else:
-                for i, (ox, oy) in enumerate(original_pos):
-                    board.move_model(unit, i, ox, oy)
-                log("Charge failed during move.")
-        else:
-            success = True
-            for idx, m in enumerate(unit.models):
+        while True:
+            aborted = False
+            for idx, _ in enumerate(unit.models):
                 label = "Leader" if idx == 0 else f"Model {idx}"
                 while True:
                     resp = get_input(
-                        f"Enter destination for {label} as 'x y': "
+                        f"Enter destination for {label} as 'x y' or 'cancel': "
                     ).strip().lower()
+                    if resp == "cancel":
+                        aborted = True
+                        break
                     try:
                         x_str, y_str = resp.split()
                         tx = int(x_str)
                         ty = int(y_str)
                     except ValueError:
-                        log("Invalid input format. Use 'x y'.")
+                        log("Invalid input format. Use 'x y' or 'cancel'.")
                         continue
                     if math.sqrt(
                         (tx - original_pos[idx][0]) ** 2
@@ -203,43 +75,28 @@ def charge_phase(board, player_units, get_input, log):
                     ) > max_distance_squares:
                         log("That position is beyond the charge distance.")
                         continue
-                    if board.move_model(unit, idx, tx, ty,
-                                       enforce_coherency=False):
+                    if board.move_model(unit, idx, tx, ty, enforce_coherency=False):
                         break
-                    log("Position invalid. Searching nearby...")
-                    if _place_model_near(
-                        board, unit, idx, tx, ty,
-                        int(max_distance_squares), log,
-                        enforce_coherency=False
-                    ):
-                        break
-                    log("Unable to place model. Try again.")
-            if success:
-                if not board.units_base_to_base(unit, target_unit):
-                    success = False
-                    log("Charge must end base-to-base with the target.")
-
-            if success and board.models_overlap():
-                success = False
-                log("Charge results in overlapping models.")
-
-            if success:
-                confirm = get_input(
-                    "Are all model locations acceptable? (Y/N): "
-                ).strip().lower()
-                if confirm not in ["y", "yes"]:
-                    for i, (ox, oy) in enumerate(original_pos):
-                        board.move_model(unit, i, ox, oy)
-                    log("Charge cancelled.")
-                else:
-                    log(f"{unit.name} successfully charged {target_unit.name}!")
-            else:
+                    log("Position invalid. Try again.")
+                if aborted:
+                    break
+            if aborted:
                 for i, (ox, oy) in enumerate(original_pos):
-                    board.move_model(unit, i, ox, oy)
+                    board.move_model(unit, i, ox, oy, enforce_coherency=False)
                 log("Charge cancelled.")
+                break
 
-def ai_charge_phase(board, ai_units, player_units, get_input, log):
-    """AI skips charging for now."""
-    log("\n--- AI Charge Phase ---")
-    for unit in ai_units:
-        log(f"{unit.name} does not charge.")
+            in_range = False
+            for enemy_unit in board.units:
+                if enemy_unit.team != unit.team:
+                    if board.units_base_to_base(unit, enemy_unit):
+                        in_range = True
+                        break
+            if not in_range:
+                log("Charge must end within 1 square of an enemy unit.")
+                for i, (ox, oy) in enumerate(original_pos):
+                    board.move_model(unit, i, ox, oy, enforce_coherency=False)
+                continue
+
+            log(f"{unit.name} successfully charged!")
+            break
