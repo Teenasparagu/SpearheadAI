@@ -4,6 +4,7 @@ import importlib
 import math
 from game_logic.units import Unit, Model
 from game_logic.board import Objective, TILE_OBJECTIVE, TILE_EMPTY
+from game_logic.utils import center_unit_on_leader_square, center_model_on_square
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
 from game_logic.factions.skaven import SkavenFactory
 from game_logic.factions.stormcast import StormcastFactory
@@ -270,10 +271,12 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                         unit.base_width,
                         unit.base_height,
                     )
+
                     for i, (dx, dy) in enumerate(offsets):
-                        unit.models[i].x = x + dx
-                        unit.models[i].y = y + dy
-                    unit.x, unit.y = x, y
+                        center_model_on_square(unit.models[i], x + dx, y + dy)
+
+                    center_unit_on_leader_square(unit, x, y)
+
                     valid, _ = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
                     if valid and board.place_unit(unit):
                         placed = True
@@ -301,9 +304,10 @@ def deploy_units(board, units, territory_bounds, enemy_bounds, zone_name, player
                         unit.base_height,
                     )
                     for i, (dx, dy) in enumerate(offsets):
-                        unit.models[i].x = x + dx
-                        unit.models[i].y = y + dy
-                    unit.x, unit.y = x, y
+                        center_model_on_square(unit.models[i], x + dx, y + dy)
+
+                    center_unit_on_leader_square(unit, x, y)
+
                     valid, reason = is_valid_unit_placement(x, y, unit, board, zone_coords, enemy_coords)
                     if not valid:
                         log(f"❌ Placement invalid: {reason}")
