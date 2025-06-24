@@ -125,6 +125,8 @@ def test_charge_phase_calls_move_unit(monkeypatch):
         return True
 
     monkeypatch.setattr(board, "move_unit", mock_move_unit)
+    monkeypatch.setattr(board, "units_base_to_base", lambda a, b: True)
+    monkeypatch.setattr(board, "models_overlap", lambda: False)
     monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
 
     responses = iter(["y", "1", "y", "y", "y"])
@@ -137,4 +139,38 @@ def test_charge_phase_calls_move_unit(monkeypatch):
     assert called.get("args") is not None
     assert len(called["args"]) == 3
     assert called["args"][0] is player_unit
+
+
+def test_charge_finishes_base_to_base(monkeypatch):
+    from game_logic.board import Board
+    from game_logic.units import Unit
+    from game_logic.factions.stormcast import StormcastFactory
+
+    board = Board(width=20, height=20)
+
+    player_unit = Unit(
+        "Test", "stormcast", team=1, num_models=1,
+        unit_data={"num_models": 1, "move_range": 6, "base_width": 1.0, "base_height": 1.0},
+    )
+    board.place_unit(player_unit)
+
+    enemy_unit = Unit(
+        "Enemy", "stormcast", team=2, num_models=1,
+        unit_data={"num_models": 1, "move_range": 6, "base_width": 1.0, "base_height": 1.0},
+    )
+    enemy_unit.x = 8
+    enemy_unit.y = 3
+    for m in enemy_unit.models:
+        m.x = 8
+        m.y = 3
+    board.place_unit(enemy_unit)
+
+    monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
+
+    responses = iter(["y", "1", "y", "y", "y"])
+
+    charge_phase.charge_phase(board, [player_unit], lambda _: next(responses), lambda *_: None)
+
+    assert board.units_base_to_base(player_unit, enemy_unit)
+    assert not board.models_overlap()
 

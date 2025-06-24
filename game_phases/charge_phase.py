@@ -158,6 +158,15 @@ def charge_phase(board, player_units, get_input, log):
                         success = False
                         break
             if success:
+                if not board.units_base_to_base(unit, target_unit):
+                    success = False
+                    log("Charge must end base-to-base with the target.")
+
+            if success and board.models_overlap():
+                success = False
+                log("Charge results in overlapping models.")
+
+            if success:
                 confirm = get_input(
                     "Are all model locations acceptable? (Y/N): "
                 ).strip().lower()
@@ -200,15 +209,29 @@ def charge_phase(board, player_units, get_input, log):
                     ):
                         break
                     log("Unable to place model. Try again.")
-            confirm = get_input(
-                "Are all model locations acceptable? (Y/N): "
-            ).strip().lower()
-            if confirm not in ["y", "yes"]:
+            if success:
+                if not board.units_base_to_base(unit, target_unit):
+                    success = False
+                    log("Charge must end base-to-base with the target.")
+
+            if success and board.models_overlap():
+                success = False
+                log("Charge results in overlapping models.")
+
+            if success:
+                confirm = get_input(
+                    "Are all model locations acceptable? (Y/N): "
+                ).strip().lower()
+                if confirm not in ["y", "yes"]:
+                    for i, (ox, oy) in enumerate(original_pos):
+                        board.move_model(unit, i, ox, oy)
+                    log("Charge cancelled.")
+                else:
+                    log(f"{unit.name} successfully charged {target_unit.name}!")
+            else:
                 for i, (ox, oy) in enumerate(original_pos):
                     board.move_model(unit, i, ox, oy)
                 log("Charge cancelled.")
-            else:
-                log(f"{unit.name} successfully charged {target_unit.name}!")
 
 def ai_charge_phase(board, ai_units, player_units, get_input, log):
     log("\n--- AI Charge Phase ---")
@@ -228,6 +251,7 @@ def ai_charge_phase(board, ai_units, player_units, get_input, log):
 
         # Find closest player model within range
         closest_enemy = None
+        closest_enemy_unit = None
         closest_dist = float("inf")
         for enemy_unit in player_units:
             for model in enemy_unit.models:
@@ -235,6 +259,7 @@ def ai_charge_phase(board, ai_units, player_units, get_input, log):
                 if dist <= max_distance_squares and dist < closest_dist:
                     closest_dist = dist
                     closest_enemy = model
+                    closest_enemy_unit = enemy_unit
 
         if not closest_enemy:
             log(f"{unit.name} found no target within {charge_roll} inches.")
@@ -267,6 +292,11 @@ def ai_charge_phase(board, ai_units, player_units, get_input, log):
             continue
 
         success = board.move_unit(unit, dest_x, dest_y)
+        if success and not board.units_base_to_base(unit, closest_enemy_unit):
+            success = False
+        if success and board.models_overlap():
+            success = False
+
         if success:
             log(f"{unit.name} successfully charged to ({dest_x}, {dest_y}).")
         else:
