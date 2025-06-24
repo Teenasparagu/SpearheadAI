@@ -22,6 +22,33 @@ class Board:
         self.objectives = []
         self.terrain = []
 
+    def bases_touching(self, model_a: Model, model_b: Model) -> bool:
+        """Return True if the two models are in base-to-base contact."""
+        for ax, ay in model_a.get_occupied_squares():
+            for bx, by in model_b.get_occupied_squares():
+                if max(abs(ax - bx), abs(ay - by)) == 1 and (ax != bx or ay != by):
+                    return True
+        return False
+
+    def units_base_to_base(self, unit_a: Unit, unit_b: Unit) -> bool:
+        """Return True if any models from the two units are in base contact."""
+        for m_a in unit_a.models:
+            for m_b in unit_b.models:
+                if self.bases_touching(m_a, m_b):
+                    return True
+        return False
+
+    def models_overlap(self) -> bool:
+        """Check if any models on the board occupy the same square."""
+        occupied = set()
+        for unit in self.units:
+            for model in unit.models:
+                for sq in model.get_occupied_squares():
+                    if sq in occupied:
+                        return True
+                    occupied.add(sq)
+        return False
+
     def place_objective(self, x, y):
         obj = Objective(x, y)
         self.objectives.append(obj)
