@@ -3,9 +3,8 @@ import random
 import importlib
 import math
 from game_logic.units import Unit, Model
-from game_logic.board import Objective
+from game_logic.board import Objective, TILE_OBJECTIVE, TILE_EMPTY
 from game_logic.terrain import RECTANGLE_WALL, L_SHAPE_WALL, rotate_shape, generate_spiral_offsets
-from game_logic.board import TILE_OBJECTIVE
 from game_logic.factions.skaven import SkavenFactory
 from game_logic.factions.stormcast import StormcastFactory
 
@@ -375,5 +374,13 @@ def is_valid_terrain_placement(x, y, rotated_shape, board, zone, enemy_zone):
     return True, None
 
 def is_valid_unit_placement(x, y, unit, board, zone, enemy_zone):
-    """Validation disabled for debugging purposes."""
+    """Check that all model squares are on the board and unoccupied."""
+
+    for model in unit.models:
+        for px, py in model.get_occupied_squares():
+            if not (0 <= px < board.width and 0 <= py < board.height):
+                return False, "out of bounds"
+            if board.grid[py][px] != TILE_EMPTY:
+                return False, "occupied"
+
     return True, None
