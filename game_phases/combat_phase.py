@@ -114,35 +114,56 @@ def resolve_melee_attacks(unit, enemy_units, log):
         f"{target.name} took {total_damage} wounds, {models_before - models_after} models died, {models_after} remain."
     )
 
+def _alternate_fights(board, enemy_map, units_by_team, start_team, log):
+    """Alternate activations between teams for the given ``units_by_team``."""
+    active = start_team
+    inactive = 2 if start_team == 1 else 1
+    while units_by_team[1] or units_by_team[2]:
+        team_units = units_by_team[active]
+        if not team_units:
+            active, inactive = inactive, active
+            continue
+        unit = team_units.pop(0)
+        if not unit.models:
+            continue
+        log(f"\n{unit.name} (Team {unit.team}) activates!")
+        pile_in(board, unit, enemy_map[unit.team])
+        resolve_melee_attacks(unit, enemy_map[unit.team], log)
+        active, inactive = inactive, active
+
+
 def combat_phase(board, current_team, player_units, ai_units, get_input, log):
     enemy_map = {1: ai_units, 2: player_units}
 
-    eligible_units = {
+    all_units = {
         1: get_eligible_combat_units(player_units, board),
-        2: get_eligible_combat_units(ai_units, board)
+        2: get_eligible_combat_units(ai_units, board),
     }
 
-    already_fought = set()
-    active_team = current_team
-    inactive_team = 2 if current_team == 1 else 1
+    def _filter(keyword, negate=False):
+        res = {
+            1: [],
+            2: [],
+        }
+        for team, units in all_units.items():
+            for u in units:
+                has_kw = keyword in u.keywords
+                if (has_kw and not negate) or (negate and not has_kw):
+                    res[team].append(u)
+        return res
+
+    strike_first = _filter("strike_first")
+    strike_last = _filter("strike_last")
+    normal = {
+        1: [u for u in all_units[1] if u not in strike_first[1] and u not in strike_last[1]],
+        2: [u for u in all_units[2] if u not in strike_first[2] and u not in strike_last[2]],
+    }
 
     log("\n>> Combat Phase Begins!")
+    log("Resolving combat abilities... (placeholder)")
 
-    while eligible_units[1] or eligible_units[2]:
-        team_units = eligible_units[active_team]
-        if not team_units:
-            active_team, inactive_team = inactive_team, active_team
-            continue
-
-        unit = team_units.pop(0)
-
-        log(f"\n{unit.name} (Team {unit.team}) activates!")
-
-        pile_in(board, unit, enemy_map[unit.team])
-        resolve_melee_attacks(unit, enemy_map[unit.team], log)
-
-        already_fought.add(id(unit))
-
-        active_team, inactive_team = inactive_team, active_team
+    _alternate_fights(board, enemy_map, strike_first, current_team, log)
+    _alternate_fights(board, enemy_map, normal, current_team, log)
+    _alternate_fights(board, enemy_map, strike_last, current_team, log)
 
     log(">> Combat Phase Ends.\n")

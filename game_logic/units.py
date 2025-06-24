@@ -99,6 +99,7 @@ class Unit:
     melee_weapons: list = field(default_factory=list)
     models: list = field(default_factory=list)
     has_run: bool = False
+    keywords: list = field(default_factory=list)
 
     def __post_init__(self):
         unit_data = self.unit_data
@@ -117,6 +118,7 @@ class Unit:
 
         self.ranged_attacks = unit_data.get("range", [])
         self.melee_weapons = unit_data.get("melee_weapons", [])
+        self.keywords = unit_data.get("keywords", self.keywords)
 
         leader_x = self.x
         leader_y = self.y
