@@ -108,7 +108,11 @@ def charge_phase(board, player_units, get_input, log):
             log("Charge cancelled.")
             continue
 
-        success = board.move_unit(unit, dest_x, dest_y, confirm=True)
+        # ``move_unit`` does not take a ``confirm`` parameter. This keyword was
+        # erroneously passed and resulted in a ``TypeError`` during runtime
+        # when a player accepted a charge. Calling the method with only the
+        # expected arguments resolves the issue.
+        success = board.move_unit(unit, dest_x, dest_y)
         if success:
             log(f"{unit.name} successfully charged {target_unit.name}!")
         else:

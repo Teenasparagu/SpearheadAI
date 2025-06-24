@@ -87,3 +87,54 @@ def test_combat_phase_no_engagement(monkeypatch):
     assert any("Combat Phase Begins" in l for l in logs)
     assert any("Combat Phase Ends" in l for l in logs)
 
+
+def test_charge_phase_calls_move_unit(monkeypatch):
+    """Ensure ``charge_phase`` invokes ``Board.move_unit`` without unexpected
+    parameters when a charge is accepted."""
+
+    from game_logic.board import Board
+    from game_logic.units import Unit
+    from game_logic.factions.stormcast import StormcastFactory
+
+    board = Board(width=20, height=20)
+
+    player_unit = Unit(
+        "Liberators", "stormcast", team=1,
+        unit_data=StormcastFactory.unit_definitions["Liberators"],
+    )
+    board.place_unit(player_unit)
+
+    enemy_unit = Unit(
+        "Liberators", "stormcast", team=2,
+        unit_data=StormcastFactory.unit_definitions["Liberators"],
+    )
+    # position enemy a few squares east so it is chargeable
+    dx = 8 - enemy_unit.x
+    dy = 3 - enemy_unit.y
+    enemy_unit.x += dx
+    enemy_unit.y += dy
+    for m in enemy_unit.models:
+        m.x += dx
+        m.y += dy
+    board.place_unit(enemy_unit)
+
+    called = {}
+
+    def mock_move_unit(unit, x, y):
+        called["args"] = (unit, x, y)
+        return True
+
+    monkeypatch.setattr(board, "move_unit", mock_move_unit)
+    monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
+
+    responses = iter(["y", "1", "y"])
+
+    def get_input(_):
+        return next(responses)
+
+    charge_phase.charge_phase(board, [player_unit], get_input, lambda *_: None)
+
+    assert called.get("args") is not None
+    assert len(called["args"]) == 3
+    assert called["args"][0] is player_unit
+
