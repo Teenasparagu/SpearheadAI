@@ -110,11 +110,16 @@ def charge_phase(board, player_units, get_input, log):
             log("Target model is on top of your model. Charge fails.")
             continue
 
-        dx /= dist
-        dy /= dist
+        def _sgn(val: float) -> int:
+            if val > 0:
+                return 1
+            if val < 0:
+                return -1
+            return 0
 
-        dest_x = closest_model.x - int(round(dx * 1))  # Stop 1 square (~0.5") away
-        dest_y = closest_model.y - int(round(dy * 1))
+        # Move toward the target along the approach vector
+        dest_x = closest_model.x - _sgn(dx)
+        dest_y = closest_model.y - _sgn(dy)
 
         if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
             log("Proposed charge destination is out of bounds.")
