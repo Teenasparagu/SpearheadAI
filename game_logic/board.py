@@ -230,8 +230,15 @@ class Board:
         print(f"{unit.name} moved to ({dest_x}, {dest_y}).")
         return True
 
-    def move_model(self, unit: Unit, model_idx: int, dest_x: int, dest_y: int):
-        """Move an individual model if the destination is valid."""
+    def move_model(self, unit: Unit, model_idx: int, dest_x: int, dest_y: int,
+                   enforce_coherency: bool = True):
+        """Move an individual model if the destination is valid.
+
+        The ``enforce_coherency`` flag controls whether the normal coherency
+        requirement (being within 2" of another model in the unit) is applied.
+        This is useful during charges where models may temporarily break
+        coherency while being repositioned.
+        """
         if model_idx < 0 or model_idx >= len(unit.models):
             return False
 
@@ -258,15 +265,16 @@ class Board:
             if self.grid[y][x] != TILE_EMPTY and (x, y) not in unit_squares:
                 return False
 
-        coherent = False
-        for i, other in enumerate(unit.models):
-            if i == model_idx:
-                continue
-            if math.sqrt((dest_x - other.x) ** 2 + (dest_y - other.y) ** 2) <= 2:
-                coherent = True
-                break
-        if not coherent and len(unit.models) > 1:
-            return False
+        if enforce_coherency:
+            coherent = False
+            for i, other in enumerate(unit.models):
+                if i == model_idx:
+                    continue
+                if math.sqrt((dest_x - other.x) ** 2 + (dest_y - other.y) ** 2) <= 2:
+                    coherent = True
+                    break
+            if not coherent and len(unit.models) > 1:
+                return False
 
         for x, y in current_squares:
             self.grid[y][x] = TILE_EMPTY
