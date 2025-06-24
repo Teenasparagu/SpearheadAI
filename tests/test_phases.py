@@ -67,10 +67,12 @@ def test_shooting_phase_no_targets(monkeypatch):
 def test_charge_phase_no_targets(monkeypatch):
     engine, _ = setup_deployment(monkeypatch)
     logs, log = _collect_log()
-    responses = ["n"] * len(engine.game_state.units["player"])
-    get_input = _fake_input_generator(responses)
+    # choose to perform no charges
+    get_input = _fake_input_generator(["0"])
 
-    charge_phase.charge_phase(engine.board, engine.game_state.units["player"], get_input, log)
+    charge_phase.charge_phase(
+        engine.board, engine.game_state.units["player"], get_input, log
+    )
 
     assert any("Charge Phase" in l for l in logs)
 
@@ -88,9 +90,8 @@ def test_combat_phase_no_engagement(monkeypatch):
     assert any("Combat Phase Ends" in l for l in logs)
 
 
-def test_charge_phase_calls_move_unit(monkeypatch):
-    """Ensure ``charge_phase`` invokes ``Board.move_unit`` without unexpected
-    parameters when a charge is accepted."""
+def test_charge_phase_calls_move_model(monkeypatch):
+    """Ensure ``charge_phase`` invokes ``Board.move_model`` when a charge is executed."""
 
     from game_logic.board import Board
     from game_logic.units import Unit
@@ -99,14 +100,14 @@ def test_charge_phase_calls_move_unit(monkeypatch):
     board = Board(width=20, height=20)
 
     player_unit = Unit(
-        "Liberators", "stormcast", team=1,
-        unit_data=StormcastFactory.unit_definitions["Liberators"],
+        "Test", "stormcast", team=1, num_models=1,
+        unit_data={"num_models": 1, "move_range": 6, "base_width": 1.0, "base_height": 1.0},
     )
     board.place_unit(player_unit)
 
     enemy_unit = Unit(
-        "Liberators", "stormcast", team=2,
-        unit_data=StormcastFactory.unit_definitions["Liberators"],
+        "Enemy", "stormcast", team=2, num_models=1,
+        unit_data={"num_models": 1, "move_range": 6, "base_width": 1.0, "base_height": 1.0},
     )
     # position enemy a few squares east so it is chargeable
     dx = 8 - enemy_unit.x
@@ -118,27 +119,23 @@ def test_charge_phase_calls_move_unit(monkeypatch):
         m.y += dy
     board.place_unit(enemy_unit)
 
-    called = {}
+    called = []
 
-    def mock_move_unit(unit, x, y):
-        called["args"] = (unit, x, y)
-        return True
+    original_move_model = board.move_model
 
-    monkeypatch.setattr(board, "move_unit", mock_move_unit)
-    monkeypatch.setattr(board, "units_base_to_base", lambda a, b: True)
-    monkeypatch.setattr(board, "models_overlap", lambda: False)
+    def mock_move_model(unit, idx, x, y, enforce_coherency=True):
+        called.append((unit, idx, x, y))
+        return original_move_model(unit, idx, x, y, enforce_coherency)
+
+    monkeypatch.setattr(board, "move_model", mock_move_model)
     monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
 
-    responses = iter(["y", "1", "y", "y", "y"])
+    responses = iter(["1", "6 3"])
 
-    def get_input(_):
-        return next(responses)
+    charge_phase.charge_phase(board, [player_unit], lambda _: next(responses), lambda *_: None)
 
-    charge_phase.charge_phase(board, [player_unit], get_input, lambda *_: None)
-
-    assert called.get("args") is not None
-    assert len(called["args"]) == 3
-    assert called["args"][0] is player_unit
+    assert called
+    assert called[0][0] is player_unit
 
 
 def test_charge_finishes_base_to_base(monkeypatch):
@@ -167,9 +164,11 @@ def test_charge_finishes_base_to_base(monkeypatch):
 
     monkeypatch.setattr(charge_phase.random, "randint", lambda a, b: 6)
 
-    responses = iter(["y", "1", "y", "y", "y"])
+    responses = iter(["1", "6 3"])
 
-    charge_phase.charge_phase(board, [player_unit], lambda _: next(responses), lambda *_: None)
+    charge_phase.charge_phase(
+        board, [player_unit], lambda _: next(responses), lambda *_: None
+    )
 
     assert board.units_base_to_base(player_unit, enemy_unit)
     assert not board.models_overlap()
