@@ -4,6 +4,7 @@ function GameViewer() {
   const [state, setState] = useState(null);
   const [inputValue, setInputValue] = useState('');
 
+
   const fetchState = () => {
     fetch('/api/state')
       .then(res => res.json())
@@ -39,6 +40,7 @@ function GameViewer() {
 
   const logItems = state.messages.map((msg, idx) => React.createElement('li', { key: idx }, msg));
 
+
   const handleSubmit = (e) => {
     e.preventDefault();
     fetch('/api/input', {
@@ -61,6 +63,7 @@ function GameViewer() {
     React.createElement('button', { key: 'btn', type: 'submit' }, 'Send')
   ]);
 
+
   const resetButton = React.createElement('form', { method: 'GET', action: '/reset', style: { position: 'absolute', top: 10, right: 10 } },
     React.createElement('button', { type: 'submit', style: { backgroundColor: 'darkred', color: 'white' } }, 'Reset Game')
   );
@@ -75,6 +78,7 @@ function GameViewer() {
     React.createElement('h1', { style: { textAlign: 'center' } }, 'Spearhead AI – Game Grid'),
     table,
     inputForm,
+
     messagesDiv
   ]);
 }

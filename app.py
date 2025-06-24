@@ -1,9 +1,11 @@
+
 try:
     from flask import Flask, jsonify, redirect, request
 except ModuleNotFoundError as exc:
     raise RuntimeError(
         "Flask is required to run the web viewer. Install dependencies via 'pip install -r requirements.txt'."
     ) from exc
+
 from game_logic.game_engine import GameEngine
 from game_phases.deployment import get_deployment_zones, formation_offsets
 import math
@@ -90,6 +92,7 @@ def api_state():
     })
 
 
+
 @app.route("/api/input", methods=["POST"])
 def api_input():
     """Accept a simple text input and log it to the game messages."""
@@ -98,6 +101,7 @@ def api_input():
         return jsonify({"error": "missing input"}), 400
     engine.game_state.messages.append(str(data["input"]))
     return jsonify({"status": "ok"})
+
 
 
 @app.route("/reset")
