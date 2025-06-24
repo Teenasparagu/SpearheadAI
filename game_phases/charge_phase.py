@@ -3,7 +3,7 @@ import random
 
 
 def _place_model_near(board, unit, model_idx: int, target_x: int, target_y: int,
-                      max_dist: int, log) -> bool:
+                      max_dist: int, log, *, enforce_coherency: bool = True) -> bool:
     """Attempt to place ``model_idx`` near ``target_x, target_y``.
 
     Searches outward one square at a time until a valid location is found that
@@ -22,7 +22,8 @@ def _place_model_near(board, unit, model_idx: int, target_x: int, target_y: int,
                     continue
                 if not (0 <= x < board.width and 0 <= y < board.height):
                     continue
-                if board.move_model(unit, model_idx, x, y):
+                if board.move_model(unit, model_idx, x, y,
+                                    enforce_coherency=enforce_coherency):
                     return True
     return False
 
@@ -154,7 +155,8 @@ def charge_phase(board, player_units, get_input, log):
                     tx = original_pos[idx][0] + dx_total
                     ty = original_pos[idx][1] + dy_total
                     if not _place_model_near(board, unit, idx, tx, ty,
-                                             int(max_distance_squares), log):
+                                             int(max_distance_squares), log,
+                                             enforce_coherency=False):
                         success = False
                         break
             if success:
@@ -201,11 +203,14 @@ def charge_phase(board, player_units, get_input, log):
                     ) > max_distance_squares:
                         log("That position is beyond the charge distance.")
                         continue
-                    if board.move_model(unit, idx, tx, ty):
+                    if board.move_model(unit, idx, tx, ty,
+                                       enforce_coherency=False):
                         break
                     log("Position invalid. Searching nearby...")
                     if _place_model_near(
-                        board, unit, idx, tx, ty, int(max_distance_squares), log
+                        board, unit, idx, tx, ty,
+                        int(max_distance_squares), log,
+                        enforce_coherency=False
                     ):
                         break
                     log("Unable to place model. Try again.")

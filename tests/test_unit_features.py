@@ -28,6 +28,17 @@ def test_move_model_coherency():
     assert board.move_model(unit, 1, unit.models[0].x + 2, unit.models[0].y)
 
 
+def test_move_model_ignore_coherency():
+    board = Board()
+    unit = Unit("Test", "stormcast", team=1, num_models=2,
+                unit_data={"num_models": 2, "move_range": 6,
+                           "base_width": 1.0, "base_height": 1.0})
+    board.place_unit(unit)
+    # normally this would fail due to coherency
+    assert board.move_model(unit, 1, unit.models[0].x + 3, unit.models[0].y,
+                             enforce_coherency=False)
+
+
 def test_triangle_offsets_coherent_placement():
     board = Board()
     unit = Unit(
