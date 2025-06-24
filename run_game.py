@@ -1,7 +1,7 @@
 """CLI runner that also launches the live board viewer."""
 from threading import Thread
 import logging
-from app import app, engine
+from app import app, start_game
 
 
 def _start_viewer() -> None:
@@ -14,10 +14,10 @@ def _start_viewer() -> None:
 
 def main() -> None:
     # Launch the Flask viewer in a background thread so the CLI can run
-    viewer = Thread(target=_start_viewer, daemon=True)
+    viewer = Thread(target=_start_viewer)
     viewer.start()
-
-    engine.run_game(get_input=input, log=print)
+    start_game()
+    viewer.join()
 
 
 if __name__ == "__main__":
