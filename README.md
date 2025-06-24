@@ -7,7 +7,8 @@ The game itself is still run from a separate command line program.
 ## Launching the Board Viewer
 
 
-1. Install dependencies (Flask, numpy, and pytest are used):
+1. Install dependencies (Flask, numpy, and pytest are used). If you see a
+   `ModuleNotFoundError` for Flask, make sure you've run:
    ```bash
    pip install -r requirements.txt
    ```
@@ -19,6 +20,7 @@ The game itself is still run from a separate command line program.
    ```
 
    Open `http://localhost:5000/` in your browser to see the board as you play.
+   The page includes a small form to send messages to the game log.
 
 
 ## Programmatic Usage

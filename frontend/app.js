@@ -2,6 +2,8 @@ const { useState, useEffect } = React;
 
 function GameViewer() {
   const [state, setState] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+
 
   const fetchState = () => {
     fetch('/api/state')
@@ -38,6 +40,30 @@ function GameViewer() {
 
   const logItems = state.messages.map((msg, idx) => React.createElement('li', { key: idx }, msg));
 
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    fetch('/api/input', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: inputValue })
+    }).then(() => {
+      setInputValue('');
+      fetchState();
+    });
+  };
+
+  const inputForm = React.createElement('form', { onSubmit: handleSubmit, style: { textAlign: 'center', margin: '20px' } }, [
+    React.createElement('input', {
+      key: 'input',
+      type: 'text',
+      value: inputValue,
+      onChange: e => setInputValue(e.target.value)
+    }),
+    React.createElement('button', { key: 'btn', type: 'submit' }, 'Send')
+  ]);
+
+
   const resetButton = React.createElement('form', { method: 'GET', action: '/reset', style: { position: 'absolute', top: 10, right: 10 } },
     React.createElement('button', { type: 'submit', style: { backgroundColor: 'darkred', color: 'white' } }, 'Reset Game')
   );
@@ -51,6 +77,8 @@ function GameViewer() {
     resetButton,
     React.createElement('h1', { style: { textAlign: 'center' } }, 'Spearhead AI – Game Grid'),
     table,
+    inputForm,
+
     messagesDiv
   ]);
 }
