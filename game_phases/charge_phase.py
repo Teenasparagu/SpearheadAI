@@ -239,70 +239,7 @@ def charge_phase(board, player_units, get_input, log):
                 log("Charge cancelled.")
 
 def ai_charge_phase(board, ai_units, player_units, get_input, log):
+    """AI skips charging for now."""
     log("\n--- AI Charge Phase ---")
-
     for unit in ai_units:
-        if unit.has_run:
-            log(f"{unit.name} ran this turn and cannot charge.")
-            continue
-
-        if not is_near_enemy(unit, board, within_inches=12):
-            log(f"{unit.name} is too far from enemy units to charge.")
-            continue
-
-        charge_roll = random.randint(1, 6) + random.randint(1, 6)
-        max_distance_squares = charge_roll * 2
-        log(f"{unit.name} rolls a {charge_roll} for charge distance.")
-
-        # Find closest player model within range
-        closest_enemy = None
-        closest_enemy_unit = None
-        closest_dist = float("inf")
-        for enemy_unit in player_units:
-            for model in enemy_unit.models:
-                dist = math.sqrt((unit.x - model.x)**2 + (unit.y - model.y)**2)
-                if dist <= max_distance_squares and dist < closest_dist:
-                    closest_dist = dist
-                    closest_enemy = model
-                    closest_enemy_unit = enemy_unit
-
-        if not closest_enemy:
-            log(f"{unit.name} found no target within {charge_roll} inches.")
-            continue
-
-        # Charge destination: 1 square away from enemy
-        dx = closest_enemy.x - unit.x
-        dy = closest_enemy.y - unit.y
-        dist = math.sqrt(dx**2 + dy**2)
-
-        if dist == 0:
-            log(f"{unit.name} is standing on the enemy? Charge skipped.")
-            continue
-
-        dx /= dist
-        dy /= dist
-
-        dest_x = closest_enemy.x - int(round(dx * 1))
-        dest_y = closest_enemy.y - int(round(dy * 1))
-
-        if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
-            log(f"{unit.name}'s charge destination is out of bounds.")
-            continue
-
-        # Check path is clear
-        path = board.get_path(unit.x, unit.y, dest_x, dest_y)
-        blocked, blocked_tile = board.is_path_blocked(path, (unit.x, unit.y), unit)
-        if blocked:
-            log(f"{unit.name}'s charge path is blocked at {blocked_tile}.")
-            continue
-
-        success = board.move_unit(unit, dest_x, dest_y)
-        if success and not board.units_base_to_base(unit, closest_enemy_unit):
-            success = False
-        if success and board.models_overlap():
-            success = False
-
-        if success:
-            log(f"{unit.name} successfully charged to ({dest_x}, {dest_y}).")
-        else:
-            log(f"{unit.name}'s charge failed during movement.")
+        log(f"{unit.name} does not charge.")

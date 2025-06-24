@@ -257,42 +257,11 @@ def retreat_move(unit, board, get_input, log):
 
                 
 def ai_movement_phase(board, ai_units, get_input, log):
+    """AI skips movement for now."""
     log("\nAI's Turn:")
     for unit in ai_units:
-        if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-            log(f"{unit.name} is in combat and cannot move unless retreating.")
-            continue
-
-        # Decide whether to run (50% chance)
-        will_run = random.choice([True, False])
-        move_range = unit.move_range
         unit.has_run = False
-
-        if will_run:
-            run_bonus = random.randint(1, 6)
-            move_range += run_bonus * 2
-            unit.has_run = True
-            log(f"{unit.name} chooses to Run! (Rolled {run_bonus})")
-
-        # Try up to 10 directions
-        for _ in range(10):
-            direction = random.choice(list(direction_map.keys()))
-            inches = round(random.uniform(1, move_range / 2), 1)
-            dx, dy = direction_map[direction]
-            dest_x = unit.x + int(round(dx * inches * 2))
-            dest_y = unit.y + int(round(dy * inches * 2))
-
-            if not (0 <= dest_x < board.width and 0 <= dest_y < board.height):
-                continue
-            if is_in_combat(unit.models[0].x, unit.models[0].y, board, unit.team):
-                continue
-
-            log(f"{unit.name} attempting to move {inches} inches toward {direction} to ({dest_x}, {dest_y})...")
-            success = board.move_unit(unit, dest_x, dest_y)
-            if success:
-                break  # ✅ move only once per turn
-        else:
-            log(f"{unit.name} couldn't find a valid direction to move.")
+        log(f"{unit.name} does not move.")
 
 
 # Additional helpers for web interface movement
