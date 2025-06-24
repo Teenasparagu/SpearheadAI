@@ -133,7 +133,7 @@ class SkavenFactory(FactionFactory):
             "move_range": 12,
             "control_score": 2,
             "health": 5,
-            "num_models": 2,
+            "num_models": 1,
             "base_width": 1.5,
             "base_height": 1.5,
             "range": [
