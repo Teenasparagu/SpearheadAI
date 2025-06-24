@@ -70,6 +70,7 @@ def attempt_move(unit, board, move_input, move_range, log):
     return board.move_unit(unit, dest_x, dest_y)
 
 def move_input_loop(unit, board, move_range, get_input, log):
+    moved = False
     while True:
         log("Enter direction and distance (e.g., 'ne 5') or type 'skip':")
         move_input = get_input(">> ").strip().lower()
@@ -121,11 +122,15 @@ def move_input_loop(unit, board, move_range, get_input, log):
 
             success = board.move_unit(unit, dest_x, dest_y)
             if success:
+                moved = True
                 break
             else:
                 log("Invalid move. Try again.")
         except ValueError:
             log("Invalid input. Format: 'ne 5' or 'skip'.")
+
+    if moved:
+        adjust_unit_formation(unit, board, get_input, log)
 
 
 
@@ -244,6 +249,7 @@ def retreat_move(unit, board, get_input, log):
                 dmg = random.randint(1, 3)
                 log(f"{unit.name} suffers {dmg} damage while retreating!")
                 unit.apply_damage(dmg)
+                adjust_unit_formation(unit, board, get_input, log)
             return
         except ValueError:
             log("Invalid input. Use format like 'sw 4.5' or 'skip'.")
@@ -315,8 +321,36 @@ def move_unit_to(unit, board, dest_x, dest_y, move_range, log):
         log(f"Path is blocked at {blocked_tile}.")
         return False
 
-    board.grid[unit.y][unit.x] = "-"
-    unit.x, unit.y = dest_x, dest_y
-    unit.models[0].x, unit.models[0].y = dest_x, dest_y
-    log(f"{unit.name} moved to ({dest_x}, {dest_y}).")
-    return True
+    # Delegate to board.move_unit which now handles formation movement
+    success = board.move_unit(unit, dest_x, dest_y)
+    if success:
+        log(f"{unit.name} moved to ({dest_x}, {dest_y}).")
+    return success
+
+
+def adjust_unit_formation(unit, board, get_input, log):
+    """Allow the player to manually reposition models after a move."""
+    log("Adjust unit formation? (y/n):")
+    choice = get_input(">> ").strip().lower()
+    if choice not in ["y", "yes"]:
+        return
+
+    for idx in range(1, len(unit.models)):
+        model = unit.models[idx]
+        while True:
+            log(f"Place model {idx} at 'x y' or type 'skip':")
+            resp = get_input(">> ").strip().lower()
+            if resp == "skip":
+                break
+            try:
+                x_str, y_str = resp.split()
+                x = int(x_str)
+                y = int(y_str)
+            except ValueError:
+                log("Invalid format. Use 'x y' or 'skip'.")
+                continue
+
+            if board.move_model(unit, idx, x, y):
+                break
+            else:
+                log("Invalid position. Try again.")
