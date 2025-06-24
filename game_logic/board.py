@@ -126,6 +126,8 @@ class Board:
         return False, None
 
     def move_unit(self, unit: Unit, dest_x, dest_y):
+        """Move the entire unit, keeping formation for all models."""
+
         if not (0 <= dest_x < BOARD_WIDTH and 0 <= dest_y < BOARD_HEIGHT):
             print("Move out of bounds!")
             return False
@@ -144,9 +146,44 @@ class Board:
             print(f"Path is blocked at {blocked_tile}.")
             return False
 
-        self.grid[unit.y][unit.x] = TILE_EMPTY
+        # compute new positions for all models
+        new_positions = []
+        unit_squares = set()
+        for m in unit.models:
+            unit_squares.update(m.get_occupied_squares())
+
+        for m in unit.models:
+            new_x = m.x + dx
+            new_y = m.y + dy
+            new_sq = []
+            w_tiles = int(round(m.base_width / 0.5))
+            h_tiles = int(round(m.base_height / 0.5))
+            for ddx in range(w_tiles):
+                for ddy in range(h_tiles):
+                    nx = new_x + ddx
+                    ny = new_y + ddy
+                    if not (0 <= nx < self.width and 0 <= ny < self.height):
+                        print("Move out of bounds!")
+                        return False
+                    if self.grid[ny][nx] != TILE_EMPTY and (nx, ny) not in unit_squares:
+                        print("Destination occupied!")
+                        return False
+                    new_sq.append((nx, ny))
+            new_positions.append((new_x, new_y, new_sq))
+
+        # clear current squares
+        for m in unit.models:
+            for x, y in m.get_occupied_squares():
+                self.grid[y][x] = TILE_EMPTY
+
+        # apply new positions
+        for idx, (new_x, new_y, new_sq) in enumerate(new_positions):
+            for x, y in new_sq:
+                self.grid[y][x] = TILE_UNIT
+            unit.models[idx].x = new_x
+            unit.models[idx].y = new_y
+
         unit.x, unit.y = dest_x, dest_y
-        unit.models[0].x, unit.models[0].y = dest_x, dest_y
 
         print(f"{unit.name} moved to ({dest_x}, {dest_y}).")
         return True

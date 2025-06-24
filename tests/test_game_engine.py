@@ -52,9 +52,19 @@ def test_run_deployment_phase(monkeypatch):
 
 
 def test_sample_turn_move(monkeypatch):
-    engine, _ = setup_deployment(monkeypatch)
-    unit = engine.game_state.units["player"][0]
-    start = (unit.x, unit.y)
-    moved = engine.board.move_unit(unit, unit.x + 1, unit.y)
+    # isolate a board with a single unit to avoid placement conflicts
+    from game_logic.board import Board
+    from game_logic.units import Unit
+    from game_logic.factions.stormcast import StormcastFactory
+
+    board = Board()
+    unit = Unit("Liberators", "stormcast", team=1,
+                unit_data=StormcastFactory.unit_definitions["Liberators"])
+    board.place_unit(unit)
+
+    start = [(m.x, m.y) for m in unit.models]
+    moved = board.move_unit(unit, unit.x + 1, unit.y)
     assert moved
-    assert (unit.x, unit.y) != start
+    delta = (1, 0)
+    for (sx, sy), model in zip(start, unit.models):
+        assert (model.x, model.y) == (sx + delta[0], sy + delta[1])
