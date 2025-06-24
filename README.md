@@ -1,25 +1,26 @@
 # SpearheadAI
 
-This project provides a basic game engine. A lightweight Flask application is
-
-included that only displays the current board state while the game itself is run
-from a separate command line program.
+This project provides a basic game engine. A lightweight Flask server exposes
+API endpoints while a small React application displays the current board state.
+The game itself is still run from a separate command line program.
 
 ## Launching the Board Viewer
 
 
-1. Install dependencies (Flask, numpy, and pytest are used):
+1. Install dependencies (Flask, numpy, and pytest are used). If you see a
+   `ModuleNotFoundError` for Flask, make sure you've run:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Run the game (this also launches the board viewer):
+2. Run the game (this also launches the React board viewer):
 
    ```bash
    python run_game.py
    ```
 
    Open `http://localhost:5000/` in your browser to see the board as you play.
+   The page includes a small form to send messages to the game log.
 
 
 ## Programmatic Usage
